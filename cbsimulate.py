@@ -130,7 +130,8 @@ def open_pack(pack_type):
         if pack_type in ["Silver", "Amethyst"]: st.session_state.silver_amethyst_pity += 1
         if pack_type in ["Ruby", "Gold"]: st.session_state.ruby_gold_pity += 1
 
-    res_str = ", ".join([f"{r}-Sao ({status})" for status, r, *g in pack_results])
+    # Đã fix lỗi hiển thị 6-Sao thành Thẻ VÀNG tại đây
+    res_str = ", ".join([f"{r}-Sao ({status})" if r < 6 else f"Thẻ VÀNG ({status})" for status, r, *g in pack_results])
     log_entry = f"📦 {pack_type} Pack #{st.session_state.pack_counts[pack_type]} (Buff: {pity_msg}) | Mở ra: {res_str}"
     st.session_state.log.insert(0, "✅ " + log_entry if got_new else "❌ " + log_entry)
 
@@ -291,4 +292,7 @@ with right_rate:
                 })
                 
         st.dataframe(pd.DataFrame(table_data), use_container_width=True, hide_index=True)
-        st.caption(f"Gói này gồm **{pack_data['size']} lá**. Chắc chắn có 1 lá **{pack_data['guar_tier']}-Sao** trở lên.")
+        
+        # Đã fix lỗi hiển thị 6-Sao ở phần caption thành Thẻ VÀNG
+        guar_label = f"{pack_data['guar_tier']}-Sao" if pack_data['guar_tier'] < 6 else "Thẻ VÀNG"
+        st.caption(f"Gói này gồm **{pack_data['size']} lá**. Chắc chắn có 1 lá **{guar_label}** trở lên.")
