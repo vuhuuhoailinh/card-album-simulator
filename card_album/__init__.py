@@ -1,0 +1,1 @@
+"""Card Album simulator package."""
