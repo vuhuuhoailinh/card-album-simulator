@@ -3,7 +3,6 @@ import streamlit as st
 import altair as alt
 
 from .config import (
-    CARD_RUSH_PACK_SIZES,
     MAX_CARDS,
     PACK_ICONS,
     PACK_ORDER,
@@ -11,9 +10,9 @@ from .config import (
     RARITIES,
     TOTAL_CARDS,
 )
-from .gacha import build_rate_rows, get_effective_pack_size, get_pity_bonus, open_bulk_packs, open_pack, rarity_label
+from .gacha import build_rate_rows, get_pity_bonus, open_bulk_packs, open_pack, rarity_label
 from .state import ensure_album_state, reset_progress, total_cards_collected
-from .simulation import run_monte_carlo
+from .liveops_simulator import simulate_liveops
 
 
 def run_app() -> None:
@@ -23,7 +22,7 @@ def run_app() -> None:
     selected_pack = render_sidebar()
     st.title("🎲 Card Album Simulator")
     
-    tab_manual, tab_auto = st.tabs(["🎮 Mở Pack", "📊 Mô Phỏng (Analytics Sandbox)"])
+    tab_manual, tab_auto, tab_config = st.tabs(["🎮 Mở Pack", "📈 LiveOps Economy Simulator", "⚙️ Economy Tuning"])
     
     with tab_manual:
         render_album_dashboard()
@@ -32,6 +31,10 @@ def run_app() -> None:
         
     with tab_auto:
         render_analytics_tab()
+        
+    with tab_config:
+        from .config_ui import render_config_tab
+        render_config_tab()
 
 
 def render_sidebar() -> str:
@@ -39,7 +42,7 @@ def render_sidebar() -> str:
         inject_sidebar_toggle_style()
         st.title("🎮GACHA MENU")
 
-        render_card_rush_section()
+        render_grand_album_section()
         st.divider()
         st.subheader("🛒 Mở Từng Pack")
         selected_pack = st.selectbox("Chọn Pack:", PACK_ORDER, key="single_pack_select")
@@ -61,7 +64,7 @@ def render_sidebar() -> str:
                     key=f"bulk_{pack}",
                 )
 
-            if st.button("🚀 BẮT ĐẦU MỞ HÀNG LOẠT", type="primary", use_container_width=True):
+            if st.button("BẮT ĐẦU MỞ HÀNG LOẠT", type="primary", use_container_width=True):
                 success, message = open_bulk_packs(st.session_state, bulk_inputs)
                 st.toast(message, icon="🎉" if success else "⚠️")
                 if success:
@@ -75,22 +78,14 @@ def render_sidebar() -> str:
     return selected_pack
 
 
-def render_card_rush_section() -> None:
-    st.toggle(
-        "⚡ Sự kiện Card Rush",
-        key="card_rush_enabled",
-        help="Khi bật, Bronze/Emerald/Silver có nhiều hơn 50% thẻ theo event Card Rush.",
-    )
-    if st.session_state.get("card_rush_enabled", False):
-        st.caption("Card Rush đang bật: Bronze rớt 3 thẻ, Emerald rớt 5 thẻ, Silver rớt 6 thẻ.")
-        
+def render_grand_album_section() -> None:
     st.toggle(
         "🏆 Grand Album",
         key="grand_album_enabled",
         help="Khi bật, cho phép Album tự động reset khi cày đủ 135 thẻ (áp dụng cho cả Mở Pack và Mô Phỏng).",
     )
-    if st.session_state.get("grand_album_enabled", False):
-        st.caption("Grand Album Mode: Khi đạt mốc 135 thẻ, kho thẻ tự reset về 0 (giữ nguyên Sao). Các thẻ tiếp theo rút được sẽ tính cho vòng Album mới.")
+    if st.session_state.get("grand_album_enabled", True):
+        st.caption("Grand Album: Khi đạt mốc 135 thẻ, kho thẻ tự reset về 0 (giữ nguyên Sao). Các thẻ tiếp theo rút được sẽ tính cho vòng Album mới.")
 
 
 def inject_sidebar_toggle_style() -> None:
@@ -137,11 +132,26 @@ def inject_sidebar_toggle_style() -> None:
 def render_pity_panel(selected_pack: str) -> None:
     st.subheader("🍀 Chỉ số Pity")
     _, pity_message = get_pity_bonus(st.session_state, selected_pack)
-    st.markdown(f"**Hiệu ứng gói đang chọn ({selected_pack}):** `{pity_message}`")
-    col_left, col_right = st.columns(2)
-    col_left.metric("Silver/Amethyst", f"{st.session_state['silver_amethyst_pity']} tạch")
-    col_right.metric("Ruby/Gold", f"{st.session_state['ruby_gold_pity']} tạch")
-    st.caption("*Tạch 3 lần Silver/Amethyst (+20%). Tạch 2 lần Ruby/Gold (+33%).*")
+    st.markdown(f"**Gói đang chọn ({selected_pack}):** `{pity_message}`")
+    # Lọc ra các gói đang bị tạch (misses > 0) và có cấu hình pity
+    pity_data = {p: misses for p, misses in st.session_state["pack_pity"].items() if misses > 0}
+    if pity_data:
+        st.caption("Các gói đang tích lũy Pity (Số lần mở xịt liên tiếp):")
+        cols = st.columns(4)
+        for i, (pack, misses) in enumerate(pity_data.items()):
+            cols[i % 4].metric(pack, f"{misses} tạch")
+    else:
+        st.caption("Hiện chưa có gói nào đang tích Pity!")
+
+    pity_rules = []
+    for pack_name, pack_config in st.session_state["config_packs"].items():
+        if pack_config["pity_threshold"] > 0 and pack_config["pity_increment"] > 0:
+            if "+" not in pack_name:
+                incr_percent = int(pack_config["pity_increment"] * 100)
+                pity_rules.append(f"{pack_name} ({pack_config['pity_threshold']} lần +{incr_percent}%)")
+                
+    if pity_rules:
+        st.caption(f"*Cơ chế (Tạch liên tiếp): {', '.join(pity_rules)}*")
 
 
 def render_album_dashboard() -> None:
@@ -219,23 +229,34 @@ def render_rate_panel(selected_pack: str) -> None:
     if selected_pack == "Rainbow":
         st.info(
             "**Cơ chế Rainbow:**\n"
-            "- 100% ra thẻ MỚI.\n"
+            "- Gói có tổng cộng 6 thẻ (5 thẻ đầu random theo tỉ lệ cao).\n"
+            "- Thẻ thứ 6 (bảo hiểm) 100% ra thẻ MỚI.\n"
             "- Ưu tiên lấp đầy Thẻ Vàng trước.\n"
             "- Nếu đã có đủ 18 Thẻ Vàng, lấp ngẫu nhiên các thẻ còn thiếu."
         )
         return
 
-    card_rush_enabled = st.session_state.get("card_rush_enabled", False)
-    base_size = PACKS[selected_pack].size
-    effective_size = get_effective_pack_size(selected_pack, card_rush_enabled)
+    effective_size = PACKS[selected_pack].size
     rows = build_rate_rows(st.session_state, selected_pack)
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(
+        pd.DataFrame(rows), 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={
+            "Thẻ MỚI": st.column_config.Column(
+                "Thẻ MỚI",
+                help="Công thức: (Thẻ chưa sở hữu / Tổng số thẻ) ^ Hệ số khó.\nNếu có Buff bảo hiểm, tỉ lệ sẽ được cộng thêm."
+            ),
+            "Thẻ TRÙNG": st.column_config.Column(
+                "Thẻ TRÙNG",
+                help="Công thức: 100% - Tỉ lệ Thẻ MỚI.\nThẻ trùng sẽ tự động được phân rã thành số Sao tương ứng với độ hiếm."
+            )
+        }
+    )
 
     guaranteed_tier = PACKS[selected_pack].guaranteed_tier
     guaranteed_label = f"{guaranteed_tier}-Sao" if guaranteed_tier < 6 else "Thẻ VÀNG"
-    caption = f"Gói này gồm **{effective_size} thẻ**. Chắc chắn có 1 thẻ **{guaranteed_label}** trở lên."
-    if card_rush_enabled and selected_pack in CARD_RUSH_PACK_SIZES:
-        caption += f" Card Rush đang đổi từ {base_size} thẻ lên {effective_size} thẻ."
+    caption = f"Gói này gồm **{effective_size} thẻ**. Chắc chắn có ít nhất 1 **{guaranteed_label}**."
     st.caption(caption)
     
     st.divider()
@@ -247,112 +268,141 @@ def is_positive_log(entry: str) -> bool:
 
 
 def render_analytics_tab() -> None:
-    st.header("🔬 Auto-Simulation (Analytics Sandbox)")
-    st.markdown("Giả lập mở gói thẻ nhiều lần để đánh giá độ khó và sự phân phối thẻ mới thu được.")
+    st.header("📈 LiveOps Economy Simulator")
+    st.markdown("Giả lập số lượng gói thẻ nhận được từ các sự kiện LiveOps dựa trên số ngày chơi và nỗ lực cày cuốc.")
     
-    if "simulation_combo" not in st.session_state:
-        st.session_state["simulation_combo"] = {}
+    col1, col2 = st.columns([1, 1.5])
+    
+    with col1:
+        st.subheader("🗓️ Thông số Cày cuốc")
+        days = st.number_input("Số ngày chơi (Days)", min_value=1, max_value=60, value=60)
+        levels_per_day = st.number_input("Số Level qua mỗi ngày", min_value=1, max_value=100, value=5)
         
-    with st.container(border=True):
-        st.markdown("🎯 **HƯỚNG DẪN**")
-        st.markdown("1. Thiết lập số lượng gói muốn thử nghiệm tại cột **📦 Mở Nhiều Pack** (Sidebar), có thể bật mode **Card Rush** hoặc **Grand Album**.")
-        st.markdown("2. Nhấn nút bên dưới để chốt cấu hình Combo và bắt đầu phân tích.")
+        st.subheader("🎯 Bật/Tắt LiveOps")
+        toggles = {}
+        toggles["win_streak"] = st.toggle(
+            "🔥 Win Streak (Mặc định tỉ lệ thắng 100%)", 
+            value=True,
+            help="Nhận phần thưởng khi đạt các chuỗi thắng liên tiếp (Assume 1 lần/mùa)."
+        )
+        toggles["key_collection"] = st.toggle(
+            "🔑 Key Collection", 
+            value=True,
+            help="Tích lũy chìa khóa qua các màn chơi để mở khóa phần thưởng."
+        )
+        toggles["master_pass"] = st.toggle(
+            "🎟️ Master Pass", 
+            value=True,
+            help="Hệ thống Battle Pass của game, gồm nhánh Free và Premium."
+        )
         
-        col_btn, col_msg = st.columns([1, 2])
-        with col_btn:
-            if st.button("🔄 LOAD DATA TỪ SIDEBAR", use_container_width=True):
-                fetched_settings = {}
-                for pack in PACK_ORDER:
-                    val = st.session_state.get(f"bulk_{pack}", 0)
-                    if val > 0:
-                        fetched_settings[pack] = val
-                st.session_state["simulation_combo"] = fetched_settings
-                st.session_state["sim_card_rush"] = st.session_state.get("card_rush_enabled", False)
-                st.session_state["sim_grand_album"] = st.session_state.get("grand_album_enabled", False)
-                if not fetched_settings:
-                    st.error("⚠️ Bạn chưa nhập số lượng nào ở Sidebar")
+        if toggles["master_pass"]:
+            toggles["master_pass_premium"] = st.checkbox("Mở khóa nhánh Premium (Yarn Pass) - $9.99", value=False)
+        else:
+            toggles["master_pass_premium"] = False
+            
+        toggles["card_rush"] = st.toggle(
+            "⚡ Card Rush", 
+            value=True,
+            help="Nhân thêm số lượng thẻ cho các gói nhận được vào ngày sự kiện."
+        )
+            
+        st.subheader("🛒 Cửa Hàng & IAP")
+        iap_selections = {}
         
-        bulk_settings = st.session_state["simulation_combo"]
-        with col_msg:
-            if not bulk_settings:
-                st.info("💡 Hệ thống đang chờ dữ liệu...")
-            else:
-                summary_text = ", ".join(f"{v} {k}" for k, v in bulk_settings.items())
-                is_rush = st.session_state.get("sim_card_rush", False)
-                is_grand = st.session_state.get("sim_grand_album", False)
+        with st.expander("🛍️ Main Shop Bundles", expanded=False):
+            iap_selections["shop_9.99"] = st.number_input("$9.99 (Decorated Pouch): +1 Silver Pack", min_value=0, value=0)
+            iap_selections["shop_19.99"] = st.number_input("$19.99 (Artisan Satchel): +1 Amethyst Pack", min_value=0, value=0)
+            iap_selections["shop_29.99"] = st.number_input("$29.99 (Exquisite Basket): +1 Ruby Pack", min_value=0, value=0)
+            iap_selections["shop_49.99"] = st.number_input("$49.99 (Overflowing Chest): +1 Rainbow Pack", min_value=0, value=0)
+            iap_selections["shop_99.99"] = st.number_input("$99.99 (Royal Vault): +3 Rainbow Pack", min_value=0, value=0)
+            
+        with st.expander("💸 Out Of Coins", expanded=False):
+            iap_selections["ooc_4"] = st.number_input("Super OOC 4 ($6.99): 2000 Coins + 2x Scissors + 1x Emerald Pack", min_value=0, value=0)
+            iap_selections["ooc_5"] = st.number_input("OOC 5 ($14.99): 5000 Coins + 3x Scissors + 2x Hammer + 1x Silver Pack", min_value=0, value=0)
+            iap_selections["ooc_6"] = st.number_input("OOC 6 ($29.99): 11000 Coins + 4x Scissors + 3x Hammer + 2x Broom + 1x Amethyst Pack", min_value=0, value=0)
+        
+        with st.expander("🔗 Chain Offer", expanded=False):
+            st.info("💡 Part 1 (Miễn phí) luôn được tự động nhận: **1x Bronze Pack** + 1x Scissors + 15m Heart.")
+            iap_selections["chain_part_2"] = st.checkbox("Mua Part 2 ($2.49) -> Nhận toàn bộ Part 2: **1x Emerald, 1x Bronze**, 900 Coins, 1x Scissors, 1x Hammer, 30m Heart", value=False)
+            iap_selections["chain_part_3"] = st.checkbox("Mua Part 3 ($4.99) -> Nhận toàn bộ Part 3: **1x Silver, 1x Emerald**, 1800 Coins, 1x Scissors, 1x Hammer, 1x Broom, 60m Heart", value=False)
+            iap_selections["chain_part_4"] = st.checkbox("Mua Part 4 ($10.99) -> Nhận toàn bộ Part 4: **1x Amethyst, 1x Emerald, 1x Silver**, 4000 Coins, 3x Scissors, 3x Hammer, 1x Broom, 1h Heart", value=False)
+            iap_selections["chain_part_5"] = st.checkbox("Mua Part 5 ($18.99) -> Nhận toàn bộ Part 5: **1x Ruby, 1x Amethyst, 1x Silver**, 8300 Coins, 2x Scissors, 2x Hammer, 2x Broom, 4h Heart", value=False)
+            iap_selections["chain_part_6"] = st.checkbox("Mua Part 6 ($27.99) -> Nhận toàn bộ Part 6: **1x Gold, 1x Silver, 1x Amethyst**, 13200 Coins, 4x Scissors, 4x Hammer, 3x Broom, 6h Heart", value=False)
+            iap_selections["chain_part_7"] = st.checkbox("Mua Part 7 ($49.99) -> Nhận toàn bộ Part 7: **1x Rainbow, 1x Ruby, 1x Emerald, 1x Silver, 1x Amethyst**, 25500 Coins, 4x Scissors, 4x Hammer, 4x Broom, 12h Heart", value=False)
+            
+    with col2:
+        if st.button("🧮 TÍNH TOÁN PHẦN THƯỞNG", type="primary", use_container_width=True):
+            res = simulate_liveops(days, levels_per_day, toggles, iap_selections, st.session_state["config_rewards"])
+            st.session_state["liveops_result"] = res
+            
+        if "liveops_result" in st.session_state:
+            res = st.session_state["liveops_result"]
+            st.success("✅ **Đã tính toán xong**")
+            
+            with st.expander("⚙️ Các giả định (Assumptions) của hệ thống", expanded=True):
+                for asm in res.get("assumptions", []):
+                    st.markdown(f"- {asm}")
+            
+            lvl = res["levels_info"]
+            st.markdown(f"**Tổng quan Level:** Chơi {lvl['total']} màn (Thắng: {lvl['normal']} Normal, {lvl['hard']} Hard, {lvl['super_hard']} Super Hard)")
+            
+            st.subheader("📦 Tổng số Gói (Packs) Nhận Được")
+            total = res["total_packs"]
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric(f"{PACK_ICONS['Bronze']} Bronze", total["Bronze"])
+            c2.metric(f"{PACK_ICONS['Emerald']} Emerald", total["Emerald"])
+            c3.metric(f"{PACK_ICONS['Silver']} Silver", total["Silver"])
+            c4.metric(f"{PACK_ICONS['Amethyst']} Amethyst", total["Amethyst"])
+            
+            if total.get("Bronze+") or total.get("Emerald+") or total.get("Silver+"):
+                cp1, cp2, cp3, _ = st.columns(4)
+                cp1.metric(f"{PACK_ICONS['Bronze+']} Bronze+", total.get("Bronze+", 0))
+                cp2.metric(f"{PACK_ICONS['Emerald+']} Emerald+", total.get("Emerald+", 0))
+                cp3.metric(f"{PACK_ICONS['Silver+']} Silver+", total.get("Silver+", 0))
+            
+            c5, c6, c7, c8 = st.columns(4)
+            c5.metric(f"{PACK_ICONS['Ruby']} Ruby", total["Ruby"])
+            c6.metric(f"{PACK_ICONS['Gold']} Gold", total["Gold"])
+            c7.metric(f"{PACK_ICONS['Rainbow']} Rainbow", total["Rainbow"])
+            c8.metric("💸 Tổng chi (IAP)", f"${res.get('total_spent', 0.0):.2f}")
+            
+            st.divider()
+            st.subheader("🔎 Chi tiết Nguồn nhận & Phần thưởng khác")
+            
+            with st.expander("⚔️ Thắng Level Hard/Super Hard (Core Gameplay)"):
+                for l in res["logs"]["core"]: st.markdown(f"- {l}")
                 
-                buffs = []
-                if is_rush:
-                    buffs.append("Card Rush")
-                if is_grand:
-                    buffs.append("Grand Album Mode")
+            if toggles["win_streak"]:
+                with st.expander("🔥 Win Streak"):
+                    for l in res["logs"]["win_streak"]: st.markdown(f"- {l}")
                     
-                if buffs:
-                    summary_text += f" ({' + '.join(buffs)})"
+            if toggles["key_collection"]:
+                with st.expander("🔑 Key Collection"):
+                    for l in res["logs"]["key_collection"]: st.markdown(f"- {l}")
                     
-                st.success(f"**Combo Đang Phân Tích:** {summary_text}")
-
-    if not bulk_settings:
-        return
-    
-    with st.form("simulation_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**1. Cài đặt vòng lặp**")
-            num_players = st.selectbox("Số lần lặp (Iterations / Virtual Players)", [100, 500, 1000, 2000, 5000], index=2, help="Lặp lại việc mở combo thẻ trên cho N người chơi ảo.")
-        
-        with col2:
-            st.markdown("**2. Bắt đầu mô phỏng**")
-            st.caption("Khởi tạo 0 thẻ ở mỗi lần lặp, mở Combo trên và ghi nhận kết quả.")
-            submit_sim = st.form_submit_button("🚀 CHẠY MÔ PHỎNG", type="primary", use_container_width=True)
-            power = 1.0
-            pity_multiplier = 1.0
+            if toggles["master_pass"]:
+                with st.expander("🎟️ Master Pass (Yarn Pass)"):
+                    for l in res["logs"]["master_pass"]: st.markdown(f"- {l}")
             
-    if submit_sim:
-        card_rush = st.session_state.get("sim_card_rush", False)
-        grand_album = st.session_state.get("sim_grand_album", False)
-        with st.spinner(f"Đang phân tích {num_players} kịch bản..."):
-            df = run_monte_carlo(num_players, bulk_settings, card_rush, grand_album, power, pity_multiplier)
-            
-        st.success("✅ Phân tích hoàn tất!")
-        
-        # Thống kê
-        avg_cards = df["new_cards"].mean()
-        max_cards = df["new_cards"].max()
-        min_cards = df["new_cards"].min()
-        avg_stars = df["stars_earned"].mean()
-        
-        st.subheader("📊 Báo cáo Chỉ số")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Thẻ Mới Trung Bình", f"{avg_cards:,.1f} thẻ")
-        c2.metric("May Mắn Nhất (Max)", f"{max_cards} thẻ")
-        c3.metric("Xui Xẻo Nhất (Min)", f"{min_cards} thẻ")
-        c4.metric("Sao dư Trung Bình", f"{avg_stars:,.0f} ⭐")
-        
-        st.divider()
-        st.subheader("📈Visualizations")
-        
-        # Phân phối Thẻ Mới (Quan trọng nhất)
-        st.markdown("**1. Đa số người chơi sẽ nhận được bao nhiêu Thẻ Mới? (Histogram)**")
-        chart_data_new = df["new_cards"].value_counts().reset_index()
-        chart_data_new.columns = ["Số Thẻ Mới", "Số Người Chơi"]
-        bar_chart_new = alt.Chart(chart_data_new).mark_bar(color="#4c78a8").encode(
-            x=alt.X("Số Thẻ Mới:O", title="Số lượng Thẻ Mới nhận được", axis=alt.Axis(labelAngle=0)),
-            y=alt.Y("Số Người Chơi:Q", title="Số lượng Người Chơi Ảo đạt được"),
-            tooltip=[alt.Tooltip("Số Thẻ Mới:O", title="Thẻ Mới"), alt.Tooltip("Số Người Chơi:Q", title="Số Người")]
-        ).properties(height=350)
-        st.altair_chart(bar_chart_new, use_container_width=True)
-        
-        # Phân phối Sao
-        st.markdown("**2. Số sao dư qua các vòng lặp**")
-        chart_data_stars = df["stars_earned"].value_counts().reset_index()
-        chart_data_stars.columns = ["Số Sao", "Số Người Chơi"]
-        bar_chart_stars = alt.Chart(chart_data_stars).mark_bar(color="#f58518").encode(
-            x=alt.X("Số Sao:Q", title="Lượng Sao thừa", bin=alt.Bin(maxbins=30)),
-            y=alt.Y("sum(Số Người Chơi):Q", title="Số lượng Người Chơi Ảo đạt được"),
-            tooltip=[alt.Tooltip("Số Sao:Q", bin=alt.Bin(maxbins=30), title="Khoảng Sao"), alt.Tooltip("sum(Số Người Chơi):Q", title="Số Người")]
-        ).properties(height=350)
-        st.altair_chart(bar_chart_stars, use_container_width=True)
-        
-        with st.expander("📄 Dữ liệu thô (Raw Data)"):
-            st.dataframe(df)
+            with st.expander("🛒 IAP / Mua sắm"):
+                iap_str = ", ".join([f"**{p}:** {v}" for p, v in res["iap_packs"].items() if v > 0])
+                if not iap_str: iap_str = "Chưa mua/nhận gói nào"
+                st.write(f"**Tổng kết Pack từ IAP:** {iap_str}")
+                for l in res["logs"]["iap"]: st.markdown(f"- {l}")
+                
+            if toggles["card_rush"]:
+                with st.expander("⚡ Card Rush Bonus"):
+                    if res["logs"].get("card_rush"):
+                        for l in res["logs"]["card_rush"]: st.markdown(f"- {l}")
+                    else:
+                        st.markdown("- Chưa có thông tin Card Rush.")
+                
+            st.divider()
+            st.subheader("🎲 Mở thử đống Pack này!")
+            if st.button("Mở hàng loạt (Feed into Gacha)"):
+                bulk_inputs = {k: v for k, v in total.items() if v > 0}
+                success, message = open_bulk_packs(st.session_state, bulk_inputs)
+                st.toast(message, icon="🎉" if success else "⚠️")
+                if success:
+                    st.rerun()

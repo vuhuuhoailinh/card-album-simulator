@@ -10,6 +10,10 @@ def fresh_pack_counts() -> dict[str, int]:
 
 
 def ensure_album_state(session_state) -> None:
+    if "config_packs" not in session_state:
+        from .config_manager import load_config_to_state
+        load_config_to_state(session_state)
+
     if "inventory" not in session_state:
         session_state["inventory"] = fresh_inventory()
     else:
@@ -27,14 +31,20 @@ def ensure_album_state(session_state) -> None:
         for pack in PACK_ORDER:
             session_state["pack_counts"].setdefault(pack, 0)
 
-    if "silver_amethyst_pity" not in session_state:
-        session_state["silver_amethyst_pity"] = 0
-    if "ruby_gold_pity" not in session_state:
-        session_state["ruby_gold_pity"] = 0
+    if "pack_pity" not in session_state:
+        session_state["pack_pity"] = fresh_pack_counts()
+    else:
+        for pack in PACK_ORDER:
+            session_state["pack_pity"].setdefault(pack, 0)
+
     if "log" not in session_state:
         session_state["log"] = []
     if "card_rush_enabled" not in session_state:
         session_state["card_rush_enabled"] = False
+    if "grand_album_enabled" not in session_state:
+        session_state["grand_album_enabled"] = True
+    if "new_card_formula_type" not in session_state:
+        session_state["new_card_formula_type"] = "simple"
 
 
 def reset_progress(session_state) -> None:

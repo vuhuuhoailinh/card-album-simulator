@@ -23,28 +23,34 @@ class PackConfig:
     size: int
     guaranteed_tier: int
     weights: dict[int, int]
+    y_value: float
+    pity_threshold: int
+    pity_increment: float
 
 
 PACKS = {
-    "Bronze": PackConfig("Bronze", 2, 1, {1: 35, 2: 26, 3: 20, 4: 11, 5: 7, 6: 1}),
-    "Emerald": PackConfig("Emerald", 3, 2, {1: 32, 2: 24, 3: 20, 4: 12, 5: 10, 6: 2}),
-    "Silver": PackConfig("Silver", 4, 3, {1: 28, 2: 22, 3: 19, 4: 15, 5: 11, 6: 5}),
-    "Amethyst": PackConfig("Amethyst", 5, 4, {1: 23, 2: 21, 3: 19, 4: 17, 5: 12, 6: 7}),
-    "Ruby": PackConfig("Ruby", 6, 4, {1: 18, 2: 18, 3: 19, 4: 20, 5: 15, 6: 10}),
-    "Gold": PackConfig("Gold", 6, 6, {1: 18, 2: 18, 3: 19, 4: 20, 5: 15, 6: 10}),
+    "Bronze": PackConfig("Bronze", 2, 1, {1: 35, 2: 26, 3: 20, 4: 11, 5: 7, 6: 1}, 1.0, 0, 0.0),
+    "Bronze+": PackConfig("Bronze+", 3, 1, {1: 35, 2: 26, 3: 20, 4: 11, 5: 7, 6: 1}, 1.0, 0, 0.0),
+    "Emerald": PackConfig("Emerald", 3, 2, {1: 32, 2: 24, 3: 20, 4: 12, 5: 10, 6: 2}, 0.5, 0, 0.0),
+    "Emerald+": PackConfig("Emerald+", 5, 2, {1: 32, 2: 24, 3: 20, 4: 12, 5: 10, 6: 2}, 0.5, 0, 0.0),
+    "Silver": PackConfig("Silver", 4, 3, {1: 28, 2: 22, 3: 19, 4: 15, 5: 11, 6: 5}, 0.0, 3, 0.20),
+    "Silver+": PackConfig("Silver+", 6, 3, {1: 28, 2: 22, 3: 19, 4: 15, 5: 11, 6: 5}, 0.0, 3, 0.20),
+    "Amethyst": PackConfig("Amethyst", 5, 4, {1: 23, 2: 21, 3: 19, 4: 17, 5: 12, 6: 7}, -0.5, 3, 0.20),
+    "Ruby": PackConfig("Ruby", 6, 5, {1: 18, 2: 18, 3: 19, 4: 20, 5: 15, 6: 10}, -1.0, 2, 0.33),
+    "Gold": PackConfig("Gold", 6, 6, {1: 18, 2: 18, 3: 19, 4: 20, 5: 15, 6: 10}, -1.0, 2, 0.33),
+    "Rainbow": PackConfig("Rainbow", 6, 6, {1: 18, 2: 18, 3: 19, 4: 20, 5: 15, 6: 10}, -1.0, 0, 0.0),
 }
 
-PACK_ORDER = ["Bronze", "Emerald", "Silver", "Amethyst", "Ruby", "Gold", "Rainbow"]
+PACK_ORDER = ["Bronze", "Bronze+", "Emerald", "Emerald+", "Silver", "Silver+", "Amethyst", "Ruby", "Gold", "Rainbow"]
 PACK_ICONS = {
     "Bronze": "🟫",
+    "Bronze+": "🟫",
     "Emerald": "🟩",
+    "Emerald+": "🟩",
     "Silver": "⬜",
+    "Silver+": "⬜",
     "Amethyst": "🟪",
     "Ruby": "🟥",
     "Gold": "🟨",
     "Rainbow": "🌈",
 }
-
-# Card Rush uses the "More!" pack sizes from the specification.
-CARD_RUSH_PACK_SIZES = {"Bronze": 3, "Emerald": 5, "Silver": 6}
-CARD_RUSH_PACKS = tuple(CARD_RUSH_PACK_SIZES.keys())
