@@ -238,8 +238,21 @@ def render_rate_panel(selected_pack: str) -> None:
 
     effective_size = PACKS[selected_pack].size
     rows = build_rate_rows(st.session_state, selected_pack)
-    if rows:
-        st.table(rows)
+    st.dataframe(
+        pd.DataFrame(rows), 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={
+            "Thẻ MỚI": st.column_config.Column(
+                "Thẻ MỚI",
+                help="Tỉ lệ bốc được thẻ mà bạn CHƯA CÓ trong Album. Được cộng dồn với Buff Pity. Sẽ về 0% nếu đã sưu tập đủ độ hiếm đó."
+            ),
+            "Thẻ TRÙNG": st.column_config.Column(
+                "Thẻ TRÙNG",
+                help="Công thức: 100% - Tỉ lệ Thẻ MỚI.\nThẻ trùng sẽ tự động được phân rã thành số Sao tương ứng với độ hiếm."
+            )
+        }
+    )
         
     guaranteed_tier = PACKS[selected_pack].guaranteed_tier
     guaranteed_label = f"{guaranteed_tier}-Sao" if guaranteed_tier < 6 else "Thẻ VÀNG"
