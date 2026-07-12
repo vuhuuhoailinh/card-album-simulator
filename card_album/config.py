@@ -1,8 +1,3 @@
-import streamlit as st
-
-st_major, st_minor = map(int, st.__version__.split('.')[:2])
-STRETCH_KWARGS = {"width": "stretch"} if (st_major > 1 or (st_major == 1 and st_minor >= 50)) else {"use_container_width": True}
-
 from dataclasses import dataclass
 
 

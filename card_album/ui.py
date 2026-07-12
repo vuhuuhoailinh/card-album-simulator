@@ -8,7 +8,6 @@ from .config import (
     PACK_ORDER,
     PACKS,
     RARITIES,
-    STRETCH_KWARGS,
     TOTAL_CARDS,
 )
 from .gacha import build_rate_rows, get_pity_bonus, open_bulk_packs, open_pack, rarity_label
@@ -48,7 +47,7 @@ def render_sidebar() -> str:
         st.subheader("🛒 Mở Từng Pack")
         selected_pack = st.selectbox("Chọn Pack:", PACK_ORDER, key="single_pack_select")
 
-        if st.button(f"MỞ 1 GÓI {selected_pack.upper()}", type="primary", **STRETCH_KWARGS):
+        if st.button(f"MỞ 1 GÓI {selected_pack.upper()}", type="primary", use_container_width=True):
             open_pack(st.session_state, selected_pack)
             st.rerun()
 
@@ -65,14 +64,14 @@ def render_sidebar() -> str:
                     key=f"bulk_{pack}",
                 )
 
-            if st.button("BẮT ĐẦU MỞ HÀNG LOẠT", type="primary", **STRETCH_KWARGS):
+            if st.button("BẮT ĐẦU MỞ HÀNG LOẠT", type="primary", use_container_width=True):
                 success, message = open_bulk_packs(st.session_state, bulk_inputs)
                 st.toast(message, icon="🎉" if success else "⚠️")
                 if success:
                     st.rerun()
 
         st.markdown("___________________")
-        if st.button("🗑️ Reset Toàn Bộ Dữ Liệu", **STRETCH_KWARGS):
+        if st.button("🗑️ Reset Toàn Bộ Dữ Liệu", use_container_width=True):
             reset_progress(st.session_state)
             st.rerun()
 
@@ -241,7 +240,7 @@ def render_rate_panel(selected_pack: str) -> None:
     rows = build_rate_rows(st.session_state, selected_pack)
     st.dataframe(
         pd.DataFrame(rows), 
-        **STRETCH_KWARGS, 
+        use_container_width=True, 
         hide_index=True,
         column_config={
             "Thẻ MỚI": st.column_config.Column(
@@ -333,7 +332,7 @@ def render_analytics_tab() -> None:
             iap_selections["chain_part_7"] = st.checkbox("Mua Part 7 ($49.99) -> Nhận toàn bộ Part 7: **1x Rainbow, 1x Ruby, 1x Emerald, 1x Silver, 1x Amethyst**, 25500 Coins, 4x Scissors, 4x Hammer, 4x Broom, 12h Heart", value=False)
             
     with col2:
-        if st.button("🧮 TÍNH TOÁN PHẦN THƯỞNG", type="primary", **STRETCH_KWARGS):
+        if st.button("🧮 TÍNH TOÁN PHẦN THƯỞNG", type="primary", use_container_width=True):
             res = simulate_liveops(days, levels_per_day, toggles, iap_selections, st.session_state["config_rewards"])
             st.session_state["liveops_result"] = res
             
