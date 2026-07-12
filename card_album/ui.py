@@ -245,7 +245,7 @@ def render_rate_panel(selected_pack: str) -> None:
         column_config={
             "Thẻ MỚI": st.column_config.Column(
                 "Thẻ MỚI",
-                help="Công thức: (Thẻ chưa sở hữu / Tổng số thẻ) ^ Hệ số khó.\nNếu có Buff bảo hiểm, tỉ lệ sẽ được cộng thêm."
+                help="Tỉ lệ bốc được thẻ mà bạn CHƯA CÓ trong Album. Được cộng dồn với Buff Pity. Sẽ về 0% nếu đã sưu tập đủ độ hiếm đó."
             ),
             "Thẻ TRÙNG": st.column_config.Column(
                 "Thẻ TRÙNG",
@@ -253,7 +253,7 @@ def render_rate_panel(selected_pack: str) -> None:
             )
         }
     )
-
+        
     guaranteed_tier = PACKS[selected_pack].guaranteed_tier
     guaranteed_label = f"{guaranteed_tier}-Sao" if guaranteed_tier < 6 else "Thẻ VÀNG"
     caption = f"Gói này gồm **{effective_size} thẻ**. Chắc chắn có ít nhất 1 **{guaranteed_label}**."
