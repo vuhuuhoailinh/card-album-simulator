@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 from .config_manager import export_config_to_json, import_config_from_json, load_config_to_state
-from .config import PACK_ICONS
+from .config import PACK_ICONS, STRETCH_KWARGS
 
 import copy
 
@@ -27,7 +27,7 @@ def render_config_tab():
     col_apply, col1, col2, col3 = st.columns(4)
     
     with col_apply:
-        if st.button("✅ Áp dụng Cấu hình", type="primary", use_container_width=True):
+        if st.button("✅ Áp dụng Cấu hình", type="primary", **STRETCH_KWARGS):
             st.session_state["config_packs"] = copy.deepcopy(st.session_state["draft_config_packs"])
             st.session_state["config_rewards"] = copy.deepcopy(st.session_state["draft_config_rewards"])
             st.session_state["new_card_formula_type"] = st.session_state["draft_new_card_formula_type"]
@@ -37,7 +37,7 @@ def render_config_tab():
             st.rerun()
             
     with col1:
-        if st.button("🔄 Khôi phục (Reset)", use_container_width=True):
+        if st.button("🔄 Khôi phục (Reset)", **STRETCH_KWARGS):
             load_config_to_state(st.session_state, None)
             clear_draft_config()
             st.success("Đã khôi phục cài đặt gốc!")
@@ -50,7 +50,7 @@ def render_config_tab():
             data=json_str,
             file_name="economy_config.json",
             mime="application/json",
-            use_container_width=True
+            **STRETCH_KWARGS
         )
     
     with col3:
@@ -177,7 +177,7 @@ def render_config_tab():
     for i in range(1, 7):
         col_config[f"Star_{i}"] = st.column_config.NumberColumn(f"Star_{i}", help=f"Trọng số bốc trúng độ hiếm {i}-Sao. Số càng to tỉ lệ càng cao.")
         
-    edited_packs = st.data_editor(df_packs, num_rows="fixed", hide_index=True, use_container_width=True, column_config=col_config)
+    edited_packs = st.data_editor(df_packs, num_rows="fixed", hide_index=True, **STRETCH_KWARGS, column_config=col_config)
     
     for idx, row in edited_packs.iterrows():
         display_name = row["Pack"]
@@ -207,7 +207,7 @@ def render_config_tab():
             "Có Pack?": st.column_config.TextColumn("Có Pack?", disabled=True)
         }
         
-        edited_df = st.data_editor(df, num_rows="fixed", hide_index=True, use_container_width=True, column_config=col_config)
+        edited_df = st.data_editor(df, num_rows="fixed", hide_index=True, **STRETCH_KWARGS, column_config=col_config)
         st.session_state["draft_config_rewards"][config_key] = {int(row[key_col]): row["Reward"] for _, row in edited_df.iterrows()}
 
     c1, c2 = st.columns(2)

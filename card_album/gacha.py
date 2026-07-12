@@ -196,6 +196,8 @@ def open_bulk_packs(session_state, bulk_settings: dict[str, int]) -> tuple[bool,
 
 def add_log(session_state, entry: str) -> None:
     session_state["log"].insert(0, entry)
+    if len(session_state["log"]) > 300:
+        session_state["log"] = session_state["log"][:300]
 
 
 def build_rate_rows(session_state, pack_type: str) -> list[dict]:
