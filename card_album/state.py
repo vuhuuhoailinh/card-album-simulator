@@ -48,12 +48,13 @@ def ensure_album_state(session_state) -> None:
 
 
 def reset_progress(session_state) -> None:
-    card_rush_enabled = session_state.get("card_rush_enabled", False)
-    grand_album_enabled = session_state.get("grand_album_enabled", False)
-    session_state.clear()
+    keys_to_clear = [
+        "inventory", "stars", "total_packs", "pack_counts", 
+        "pack_pity", "log", "grand_album_completions", "grand_album_finished"
+    ]
+    for k in keys_to_clear:
+        session_state.pop(k, None)
     ensure_album_state(session_state)
-    session_state["card_rush_enabled"] = card_rush_enabled
-    session_state["grand_album_enabled"] = grand_album_enabled
 
 
 def total_cards_collected(session_state) -> int:

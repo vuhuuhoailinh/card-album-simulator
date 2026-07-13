@@ -16,25 +16,28 @@ def init_draft_config():
         st.session_state["draft_new_card_power"] = st.session_state.get("new_card_power", 1.0)
 
 def clear_draft_config():
-    for key in ["draft_config_packs", "draft_config_rewards", "draft_new_card_formula_type", "draft_new_card_power"]:
+    keys_to_clear = [
+        "draft_config_packs", "draft_config_rewards", 
+        "draft_new_card_formula_type", "draft_new_card_power",
+        "pack_config_editor", "reward_editor_master_pass_free",
+        "reward_editor_win_streak_rewards", "reward_editor_master_pass_premium",
+        "reward_editor_key_collection_rewards"
+    ]
+    for key in keys_to_clear:
         st.session_state.pop(key, None)
 
 def render_config_tab():
     init_draft_config()
-    st.header("⚙️ Nền kinh tế (Economy Tuning)")
+    st.header("⚙️ Economy Tuning")
+    if st.session_state.pop("show_config_success", False):
+        st.success("✅ Đã áp dụng các thay đổi cấu hình lên hệ thống!")
+
     st.markdown("Tab này cho phép tinh chỉnh toàn bộ hệ thống nền kinh tế, từ tỉ lệ rớt thẻ đến phần thưởng của các sự kiện.")
     
     col_apply, col1, col2, col3 = st.columns(4)
     
     with col_apply:
-        if st.button("✅ Áp dụng Cấu hình", type="primary", use_container_width=True):
-            st.session_state["config_packs"] = copy.deepcopy(st.session_state["draft_config_packs"])
-            st.session_state["config_rewards"] = copy.deepcopy(st.session_state["draft_config_rewards"])
-            st.session_state["new_card_formula_type"] = st.session_state["draft_new_card_formula_type"]
-            st.session_state["new_card_power"] = st.session_state["draft_new_card_power"]
-            st.success("Đã áp dụng cấu hình lên toàn hệ thống!")
-            # Note: No need to clear draft here since draft is already equal to main state.
-            st.rerun()
+        applied = st.button("✅ Áp dụng Cấu hình", type="primary", use_container_width=True)
             
     with col1:
         if st.button("🔄 Khôi phục (Reset)", use_container_width=True):
@@ -69,25 +72,11 @@ def render_config_tab():
     with st.expander("📖 Hướng dẫn cấu hình Hệ thống & Công thức Tỉ lệ", expanded=False):
         st.markdown("""
         **1. Công thức tính cơ hội rớt Thẻ Mới (Cốt lõi của Game):**
-        Game hiện tại hỗ trợ 2 loại công thức để tính tỉ lệ ra thẻ mới. Bạn có thể chọn ở mục "Thông số Hệ thống". Cả 2 đều dựa trên số thẻ bạn còn thiếu.
+        Game hiện tại áp dụng công thức sau để tính tỉ lệ ra thẻ mới:
         
-        *   **Công thức Đơn giản (Tuyến tính / Mặc định):**
-            `Cơ hội = [(Thẻ tối đa - Thẻ đang có) / Thẻ tối đa] ^ x + Pity`
-            - `x` chính là **Hệ số Khó thẻ mới (new_card_power)**.
-            - *Ví dụ:* Nếu bạn đã sưu tập 4/5 thẻ ở độ hiếm 1-Sao. Bạn còn thiếu 1 thẻ. Tỉ lệ còn thiếu = 1/5 = 20%.
-                - Nếu `x = 1.0`: Tỉ lệ ra thẻ mới = 20% ^ 1 = 20%.
-                - Nếu `x = 2.0`: Tỉ lệ ra thẻ mới = 20% ^ 2 = 4%.
-                - **Nhận xét:** Công thức này áp dụng chung 1 hệ số `x` cho tất cả các gói thẻ.
-                
-        *   **Công thức Tài liệu (Nâng cao theo Game Design):**
-            `Cơ hội = [(Thẻ tối đa - Thẻ đang có) / Thẻ tối đa] ^ (x + y) + Pity`
-            - `x` là **Hệ số Khó chung (new_card_power)**.
-            - `y` là **Hệ số Bù trừ riêng (y_value)** của từng Gói thẻ (Pack).
-            - *Ví dụ:* Vẫn là 4/5 thẻ (tỉ lệ 20%). Nếu `x = 3.0` (cấu hình chung) và bạn mở gói Silver có `y = 0.0`:
-                - Tỉ lệ = 20% ^ (3 + 0) = 20% ^ 3 = 0.8%.
-                - Nhưng nếu bạn mở gói Ruby có `y = -1.0` (gói VIP, dễ ra thẻ hơn):
-                - Tỉ lệ = 20% ^ (3 - 1) = 20% ^ 2 = 4%.
-                - **Nhận xét:** Công thức này giúp các gói thẻ VIP (như Ruby, Gold) có khả năng rớt thẻ mới cao hơn hẳn các gói thường nhờ `y_value` âm.
+        `New Card Ratio = (Remaining New/Total)^(x+y) + Pity`
+        - `x`: Base for all pack, default = 1
+        - `y`: Base each pack (Cấu hình riêng trong từng gói thẻ giúp gói thẻ xịn dễ rớt thẻ mới hơn)
         
         **2. Giải thích Bảng Tỉ lệ Gói Thẻ (Packs Config):**
         Bạn có thể rê chuột vào biểu tượng ❓ trên tiêu đề các cột trong bảng bên dưới để xem chú thích (tooltip) chi tiết.
@@ -104,38 +93,14 @@ def render_config_tab():
 
     # ----------------- SYSTEM CONFIG -----------------
     st.subheader("⚙️ Thông số Hệ thống")
-    col_sys1, col_sys2 = st.columns(2)
-    
-    with col_sys1:
-        current_formula = st.session_state["draft_new_card_formula_type"]
-        formula_options = {
-            "document": "Công thức Tài liệu (Lũy thừa x+y)",
-            "simple": "Công thức Đơn giản (Lũy thừa x)"
-        }
-        formula_keys = list(formula_options.keys())
-        default_index = formula_keys.index(current_formula) if current_formula in formula_keys else 0
-        
-        selected_formula_display = st.selectbox(
-            "Loại công thức rớt thẻ mới",
-            options=list(formula_options.values()),
-            index=default_index,
-            help="Đổi công thức tính tỉ lệ rớt thẻ mới. Xem phần Hướng dẫn để biết sự khác biệt."
-        )
-        
-        selected_formula = [k for k, v in formula_options.items() if v == selected_formula_display][0]
-        if selected_formula != current_formula:
-            st.session_state["draft_new_card_formula_type"] = selected_formula
+    power = st.session_state["draft_new_card_power"]
+    new_power = st.slider(
+        "Hệ số Khó chung (x) theo công thức tính tỉ lệ rớt thẻ MỚI: **New Card Ratio = (Remaining New/Total)^(x+y) + Pity**", 
+        min_value=0.1, max_value=5.0, value=float(power), step=0.1, 
+        help="Hệ số lũy thừa x. Giá trị càng cao, khi bạn sưu tập được càng nhiều thẻ thì cơ hội ra thẻ mới càng nhỏ."
+    )
+    st.session_state["draft_new_card_formula_type"] = "document"
             
-    with col_sys2:
-        power = st.session_state["draft_new_card_power"]
-        new_power = st.number_input(
-            "Hệ số Khó chung (x / new_card_power)", 
-            min_value=0.1, max_value=5.0, value=power, step=0.1, 
-            help="Hệ số lũy thừa x. Giá trị càng cao, khi bạn sưu tập được càng nhiều thẻ thì cơ hội ra thẻ mới càng nhỏ."
-        )
-        if new_power != power:
-            st.session_state["draft_new_card_power"] = new_power
-        
     st.divider()
     
     # ----------------- PACKS CONFIG -----------------
@@ -177,19 +142,7 @@ def render_config_tab():
     for i in range(1, 7):
         col_config[f"Star_{i}"] = st.column_config.NumberColumn(f"Star_{i}", help=f"Trọng số bốc trúng độ hiếm {i}-Sao. Số càng to tỉ lệ càng cao.")
         
-    edited_packs = st.data_editor(df_packs, num_rows="fixed", hide_index=True, use_container_width=True, column_config=col_config)
-    
-    for idx, row in edited_packs.iterrows():
-        display_name = row["Pack"]
-        pack_name = pack_name_mapping.get(display_name, display_name)
-        p = st.session_state["draft_config_packs"][pack_name]
-        p["size"] = int(row["Size"])
-        p["guaranteed_tier"] = int(row["Guaranteed"])
-        p["y_value"] = float(row["y_value"])
-        p["pity_threshold"] = int(row["Pity Threshold"])
-        p["pity_increment"] = float(row["Pity Incr"])
-        for i in range(1, 7):
-            p["weights"][str(i)] = int(row[f"Star_{i}"])
+    edited_packs = st.data_editor(df_packs, num_rows="fixed", hide_index=True, use_container_width=True, column_config=col_config, key="pack_config_editor")
 
     st.divider()
 
@@ -202,19 +155,50 @@ def render_config_tab():
         df["Có Pack?"] = df["Reward"].apply(lambda x: "📦" if "Pack" in str(x) else "")
         
         # Configure columns so key_col and Có Pack? are non-editable
-        col_config = {
+        reward_col_config = {
             key_col: st.column_config.NumberColumn(key_col, disabled=True),
             "Có Pack?": st.column_config.TextColumn("Có Pack?", disabled=True)
         }
         
-        edited_df = st.data_editor(df, num_rows="fixed", hide_index=True, use_container_width=True, column_config=col_config)
-        st.session_state["draft_config_rewards"][config_key] = {int(row[key_col]): row["Reward"] for _, row in edited_df.iterrows()}
+        edited_df = st.data_editor(df, num_rows="fixed", hide_index=True, use_container_width=True, column_config=reward_col_config, key=f"reward_editor_{config_key}")
+        return edited_df
 
     c1, c2 = st.columns(2)
     with c1:
-        render_reward_editor("🎁 Master Pass (Free)", "master_pass_free", "Level")
-        render_reward_editor("🔥 Win Streak", "win_streak_rewards", "Wins")
+        edited_mp_free = render_reward_editor("🎁 Master Pass (Free)", "master_pass_free", "Level")
+        edited_ws = render_reward_editor("🔥 Win Streak", "win_streak_rewards", "Wins")
     with c2:
-        render_reward_editor("👑 Master Pass (Premium)", "master_pass_premium", "Level")
-        render_reward_editor("🔑 Key Collection", "key_collection_rewards", "Stage")
+        edited_mp_prem = render_reward_editor("👑 Master Pass (Premium)", "master_pass_premium", "Level")
+        edited_kc = render_reward_editor("🔑 Key Collection", "key_collection_rewards", "Stage")
+
+    if applied:
+        # Apply System Config
+        st.session_state["draft_new_card_power"] = new_power
+        st.session_state["new_card_formula_type"] = "document"
+        st.session_state["new_card_power"] = new_power
+        
+        # Apply Packs Config
+        for idx, row in edited_packs.iterrows():
+            display_name = row["Pack"]
+            pack_name = pack_name_mapping.get(display_name, display_name)
+            p = st.session_state["draft_config_packs"][pack_name]
+            p["size"] = int(row["Size"])
+            p["guaranteed_tier"] = int(row["Guaranteed"])
+            p["y_value"] = float(row["y_value"])
+            p["pity_threshold"] = int(row["Pity Threshold"])
+            p["pity_increment"] = float(row["Pity Incr"])
+            for i in range(1, 7):
+                p["weights"][str(i)] = int(row[f"Star_{i}"])
+        st.session_state["config_packs"] = copy.deepcopy(st.session_state["draft_config_packs"])
+        
+        # Apply Rewards Config
+        st.session_state["draft_config_rewards"]["master_pass_free"] = {int(row["Level"]): row["Reward"] for _, row in edited_mp_free.iterrows()}
+        st.session_state["draft_config_rewards"]["win_streak_rewards"] = {int(row["Wins"]): row["Reward"] for _, row in edited_ws.iterrows()}
+        st.session_state["draft_config_rewards"]["master_pass_premium"] = {int(row["Level"]): row["Reward"] for _, row in edited_mp_prem.iterrows()}
+        st.session_state["draft_config_rewards"]["key_collection_rewards"] = {int(row["Stage"]): row["Reward"] for _, row in edited_kc.iterrows()}
+        st.session_state["config_rewards"] = copy.deepcopy(st.session_state["draft_config_rewards"])
+        
+        st.toast("✅ Cấu hình đã được lưu thành công!")
+        st.session_state["show_config_success"] = True
+        st.rerun()
 

@@ -20,7 +20,42 @@ def run_app() -> None:
     ensure_album_state(st.session_state)
 
     selected_pack = render_sidebar()
-    st.title("🎲 Card Album Simulator")
+    
+    col_title, col_btn = st.columns([0.95, 0.05], vertical_alignment="bottom")
+    with col_title:
+        st.title("🎲 Card Album Simulator")
+    with col_btn:
+        st.markdown(
+            """
+            <span id="info-button-target"></span>
+            <style>
+            div.element-container:has(#info-button-target) + div.element-container button {
+                border-radius: 50% !important;
+                padding: 0 !important;
+                min-width: 28px !important;
+                width: 28px !important;
+                min-height: 28px !important;
+                height: 28px !important;
+                font-weight: normal !important;
+                font-size: 16px !important;
+                font-style: italic !important;
+                font-family: 'Times New Roman', serif !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                background-color: white !important;
+                color: black !important;
+                border: 1px solid black !important;
+            }
+            div.element-container:has(#info-button-target) + div.element-container button * {
+                color: black !important;
+            }
+            </style>
+            """, 
+            unsafe_allow_html=True
+        )
+        if st.button("i", type="primary", help="Infomation"):
+            show_logic_dialog()
     
     tab_manual, tab_auto, tab_config = st.tabs(["🎮 Mở Pack", "📈 LiveOps Economy Simulator", "⚙️ Economy Tuning"])
     
@@ -71,7 +106,7 @@ def render_sidebar() -> str:
                     st.rerun()
 
         st.markdown("___________________")
-        if st.button("🗑️ Reset Toàn Bộ Dữ Liệu", use_container_width=True):
+        if st.button("🗑️ Reset Dữ Liệu Mở Pack", use_container_width=True):
             reset_progress(st.session_state)
             st.rerun()
 
@@ -406,3 +441,34 @@ def render_analytics_tab() -> None:
                 st.toast(message, icon="🎉" if success else "⚠️")
                 if success:
                     st.rerun()
+
+@st.dialog("📖 TỔNG QUAN LOGIC HỆ THỐNG", width="large")
+def show_logic_dialog():
+    st.markdown('''
+### 1. Cơ Chế Gacha Cơ Bản & Pity (Bảo hiểm)
+- **Tỉ lệ rớt (Drop Rates):** Mỗi gói thẻ có số lượng thẻ và tỉ lệ rớt các độ hiếm khác nhau. Tỉ lệ này tự động trượt theo số lượng thẻ bạn còn thiếu (càng gần full album, tỉ lệ rớt thẻ Mới càng thấp). Bạn có thể xem và chỉnh sửa Tỉ Lệ Động ở tab `⚙️ Economy Tuning`.
+- **Thẻ Bảo Hiểm:** Mỗi gói đều cam kết rớt ít nhất 1 thẻ từ 1 độ hiếm cụ thể trở lên (Ví dụ gói Emerald chắc chắn có ít nhất 1 thẻ 2-Sao).
+- **Cơ Chế Pity (Đếm Tạch):** 
+  - Hoạt động **độc lập** cho TỪNG LOẠI GÓI THẺ. (Tạch Silver không cộng dồn cho Amethyst).
+  - Mỗi khi mở một gói và không ra bất kỳ thẻ **NEW** nào, số lần "Tạch" của gói đó tăng lên 1.
+  - Khi tạch đến ngưỡng quy định, gói đó sẽ được **buff thêm % Tỉ lệ ra Thẻ Mới** ở lần mở sau. (Vd: Gói Silver tạch 3 lần sẽ buff +20%).
+- **Ngắt Pity Giữa Chừng (Mid-Pack Reset):** Tuy % Pity được buff cho *toàn bộ* các thẻ trong gói, nhưng ngay khoảnh khắc thẻ đầu tiên nổ ra chữ **NEW**, lượng % buff này sẽ lập tức bốc hơi (về 0%) để các thẻ còn lại không bị lạm phát phi lý.
+
+### 2. Rainbow Pack & 5 Gói Tân Thủ
+- **Tân Thủ:** 5 gói thẻ đầu tiên bạn nhận được trong Mùa (từ bất kỳ nguồn nào) sẽ được hệ thống buff **100% rớt toàn Thẻ Mới**.
+- **Rainbow Pack:** Gói thẻ đặc quyền có 6 thẻ, trong đó chắc chắn 100% rớt 1 Thẻ Mới. Thuật toán sẽ luôn ưu tiên rớt **Thẻ Vàng (6-Sao)** trước. Nếu thẻ Vàng đã đầy, hệ thống sẽ rớt ngẫu nhiên các độ hiếm còn thiếu khác.
+
+### 3. Grand Album & Thẻ Trùng (Duplicated)
+- **Hoàn thành Album:** Sau khi sưu tập đủ 135 thẻ, bạn sẽ hoàn thành vòng Album và được thăng cấp sang "Grand Album".
+- **Luật Reset:** Khi thăng cấp, kho thẻ sẽ **bị Reset về 0**, nhưng lượng **Sao (Stars)** tích lũy được giữ nguyên vẹn.
+- **Thẻ Trùng:** Mọi thẻ trùng lặp khi quay ra sẽ tự động phân rã thành **Sao**. Thẻ càng hiếm, số Sao thu được càng cao (Từ 1 Sao lên tới 15 Sao).
+
+### 4. Hệ Sinh Thái LiveOps (Sự kiện & Nền kinh tế)
+Trong tab `📈 LiveOps Simulator`, bạn có thể giả lập hành trình cày cuốc theo ngày thông qua các hệ thống sau:
+- **Core Gameplay (Vượt Ải):** Thắng màn Hard được thưởng gói Bronze, thắng Super Hard thưởng gói Emerald.
+- **Win Streak:** Giữ chuỗi thắng liên tiếp để càn quét các phần thưởng dọc đường (Gói Bronze đến tận Ruby).
+- **Master Pass (Battle Pass):** Thu thập token từ các màn chơi. Nhánh Premium (trả phí) sẽ cung cấp số lượng Pack khổng lồ.
+- **Key Collection:** Cày chìa khóa theo tiến độ để mở Rương chặng.
+- **Chain Offer & IAP:** Các sự kiện bán gói ưu đãi theo chuỗi (nhận phần đầu miễn phí, các phần sau dùng tiền thật để tối đa hoá thẻ cao cấp).
+- **⚡ Card Rush:** Sự kiện đặc biệt xuất hiện vào các ngày cuối tuần hoặc thứ 4. Khi kích hoạt, các gói thẻ thường (Bronze, Emerald, Silver) sẽ thức tỉnh thành dạng **Plus (+)**, nhồi thêm số lượng thẻ rớt ra nhưng vẫn giữ nguyên tỉ lệ hiếm, giúp bạn sưu tập thần tốc!
+    ''')

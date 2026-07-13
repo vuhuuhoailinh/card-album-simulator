@@ -13,14 +13,14 @@ def rarity_label(rarity: int) -> str:
     return RARITY_LABELS[rarity]
 
 
+
 def get_pity_bonus(session_state, pack_type: str) -> tuple[float, str]:
-    if session_state["total_packs"] < 5:
+    if session_state.get("total_packs", 0) <= 5:
         return 1.0, "+100% (5 Gói Đầu Tiên)"
 
     pack_config = session_state["config_packs"][pack_type]
     threshold = pack_config.get("pity_threshold", 0)
     increment = pack_config.get("pity_increment", 0.0)
-    
     misses = session_state["pack_pity"].get(pack_type, 0)
     
     if threshold > 0 and misses >= threshold:
@@ -44,7 +44,7 @@ def check_grand_album(session_state) -> None:
                 add_log(session_state, "🏆 CHÚC MỪNG! Đã hoàn thành toàn bộ Grand Album! Các thẻ tiếp theo sẽ biến thành Sao.")
 
 
-def calculate_new_chance(session_state, rarity: int, pity_bonus: float, pack_type: str) -> float:
+def calculate_new_chance(session_state, rarity: int, pack_type: str) -> float:
     cards_owned = session_state["inventory"][rarity]
     max_cards = MAX_CARDS[rarity]
     if cards_owned >= max_cards:
@@ -62,14 +62,20 @@ def calculate_new_chance(session_state, rarity: int, pity_bonus: float, pack_typ
     else:
         final_power = power
         
-    base_new = base_new ** final_power
-    return min(1.0, base_new + pity_bonus)
+    return min(1.0, base_new ** final_power)
 
 
 def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str) -> tuple[str, int]:
-    new_chance = calculate_new_chance(session_state, rarity, pity_bonus, pack_type)
+    cards_owned = session_state["inventory"][rarity]
+    max_cards = MAX_CARDS[rarity]
+    
+    if cards_owned >= max_cards:
+        final_chance = 0.0
+    else:
+        new_chance = calculate_new_chance(session_state, rarity, pack_type)
+        final_chance = min(1.0, new_chance + pity_bonus)
 
-    if random.random() < new_chance:
+    if random.random() < final_chance:
         session_state["inventory"][rarity] += 1
         check_grand_album(session_state)
         return "NEW", rarity
@@ -88,6 +94,7 @@ def open_pack(session_state, pack_type: str) -> None:
     
     got_new = False
     raw_results = []
+    current_pity_bonus = pity_bonus
 
     for _ in range(effective_size - 1):
         rarity_str = random.choices(
@@ -95,20 +102,26 @@ def open_pack(session_state, pack_type: str) -> None:
             weights=list(pack_config["weights"].values()),
         )[0]
         rarity = int(rarity_str)
-        status, final_rarity = roll_card(session_state, rarity, pity_bonus, pack_type)
-        got_new = got_new or status == "NEW"
+        status, final_rarity = roll_card(session_state, rarity, current_pity_bonus, pack_type)
+        if status == "NEW":
+            got_new = True
+            current_pity_bonus = 0.0 # Reset immediately when a new card is chosen
         raw_results.append((status, final_rarity))
 
     is_rainbow = (pack_type == "Rainbow")
     if is_rainbow:
         wild_status, wild_rarity = open_rainbow_pack_guaranteed(session_state)
-        got_new = got_new or (wild_status == "NEW")
+        if wild_status == "NEW":
+            got_new = True
+            current_pity_bonus = 0.0
         raw_results.append((wild_status, wild_rarity))
     else:
         guaranteed_tier = pack_config["guaranteed_tier"]
         guaranteed_rarity = guaranteed_tier
-        status, final_rarity = roll_card(session_state, guaranteed_rarity, pity_bonus, pack_type)
-        got_new = got_new or status == "NEW"
+        status, final_rarity = roll_card(session_state, guaranteed_rarity, current_pity_bonus, pack_type)
+        if status == "NEW":
+            got_new = True
+            current_pity_bonus = 0.0
         raw_results.append((status, final_rarity))
 
     # Sort by rarity ascending
@@ -212,7 +225,7 @@ def build_rate_rows(session_state, pack_type: str) -> list[dict]:
     for rarity_str, weight in pack_config["weights"].items():
         rarity = int(rarity_str)
         drop_rate = weight / total_weight
-        new_chance = calculate_new_chance(session_state, rarity, pity_bonus, pack_type)
+        new_chance = calculate_new_chance(session_state, rarity, pack_type)
         duplicate_chance = 1.0 - new_chance
         new_value = f"{new_chance * 100:.1f}%"
         if pity_bonus > 0 and session_state["inventory"][rarity] < MAX_CARDS[rarity]:

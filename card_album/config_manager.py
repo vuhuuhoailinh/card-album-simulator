@@ -32,6 +32,10 @@ def get_default_config() -> dict:
             "master_pass_premium": copy.deepcopy(MASTER_PASS_PREMIUM),
             "win_streak_rewards": copy.deepcopy(WIN_STREAK_REWARDS),
             "key_collection_rewards": copy.deepcopy(KEY_COLLECTION_REWARDS),
+        },
+        "system": {
+            "new_card_power": 1.0,
+            "new_card_formula_type": "document"
         }
     }
 
