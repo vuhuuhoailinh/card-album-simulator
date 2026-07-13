@@ -24,11 +24,12 @@ def render_monte_carlo_tab():
     col1, col2 = st.columns([1, 2])
     with col1:
         iterations = st.number_input("Số lần chạy mô phỏng (Iterations)", min_value=10, max_value=5000, value=100, step=10)
+        simulate_from_scratch = st.checkbox("🔄 Bắt đầu từ Kho Thẻ Trống", value=True, help="Nếu bật, mỗi lần chạy sẽ bắt đầu với 0 thẻ và 0 sao (Mô phỏng từ đầu game). Nếu tắt, sẽ bốc tiếp trên số thẻ bạn đang có hiện tại.")
         start_btn = st.button("🚀 BẮT ĐẦU MÔ PHỎNG", type="primary", use_container_width=True)
         
     if start_btn:
         with st.spinner(f"Đang giả lập {iterations} lần bóc {total_cart_packs} pack..."):
-            results = run_monte_carlo(st.session_state, cart, iterations)
+            results = run_monte_carlo(st.session_state, cart, iterations, simulate_from_scratch)
             st.session_state["mc_results"] = results
             
     if "mc_results" in st.session_state:
@@ -36,7 +37,7 @@ def render_monte_carlo_tab():
         render_monte_carlo_results(res, iterations, total_cart_packs)
 
 
-def run_monte_carlo(base_state, cart, iterations):
+def run_monte_carlo(base_state, cart, iterations, simulate_from_scratch=True):
     cards_collected = []
     stars_collected = []
     grand_album_count = []
@@ -44,19 +45,20 @@ def run_monte_carlo(base_state, cart, iterations):
     for _ in range(iterations):
         # Create an isolated dummy state
         sim_state = {
-            "inventory": copy.deepcopy(base_state["inventory"]),
-            "stars": base_state["stars"],
-            "total_packs": base_state["total_packs"],
-            "pack_counts": copy.deepcopy(base_state["pack_counts"]),
-            "pack_pity": copy.deepcopy(base_state["pack_pity"]),
+            "inventory": fresh_inventory() if simulate_from_scratch else copy.deepcopy(base_state["inventory"]),
+            "stars": 0 if simulate_from_scratch else base_state["stars"],
+            "total_packs": 0 if simulate_from_scratch else base_state["total_packs"],
+            "pack_counts": fresh_pack_counts() if simulate_from_scratch else copy.deepcopy(base_state["pack_counts"]),
+            "pack_pity": fresh_pack_counts() if simulate_from_scratch else copy.deepcopy(base_state["pack_pity"]),
             "log": [], # We don't care about logs in MC
             "card_rush_enabled": base_state["card_rush_enabled"],
             "grand_album_enabled": base_state["grand_album_enabled"],
-            "grand_album_completions": base_state.get("grand_album_completions", 0),
-            "grand_album_finished": base_state.get("grand_album_finished", False),
+            "grand_album_completions": 0 if simulate_from_scratch else base_state.get("grand_album_completions", 0),
+            "grand_album_finished": False if simulate_from_scratch else base_state.get("grand_album_finished", False),
             "new_card_formula_type": base_state["new_card_formula_type"],
             "config_packs": base_state["config_packs"],
-            "new_card_power": base_state.get("new_card_power", 1.0)
+            "new_card_power": base_state.get("new_card_power", 1.0),
+            "pity_multiplier": base_state.get("pity_multiplier", 1.0)
         }
         
         # Run the bulk open
@@ -89,7 +91,7 @@ def render_monte_carlo_results(res, iterations, total_cart_packs):
     avg_stars = df["stars"].mean()
     
     # Calculate completions
-    start_completions = st.session_state.get("grand_album_completions", 0)
+    start_completions = 0 if st.session_state.get("simulate_from_scratch", True) else st.session_state.get("grand_album_completions", 0)
     # A run is considered to have completed the album if its final completions > start_completions
     # OR if it was already finished, but we'll assume we care about new completions
     completions = df[df["grand_albums"] > start_completions]

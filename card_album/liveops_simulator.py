@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Dict, Any, List
 from .config import PACK_ORDER
 
@@ -26,12 +27,19 @@ def upgrade_pack(pack: str, is_cr: bool) -> str:
     return pack
 
 def add_packs_from_string(reward_str: str, packs_dict: dict, is_cr: bool, day: int = 0, source: str = "", cr_detailed_logs: list = None):
+    if not isinstance(reward_str, str):
+        reward_str = str(reward_str)
     for base in ["Bronze", "Emerald", "Silver", "Amethyst", "Ruby", "Gold", "Rainbow"]:
-        if base in reward_str:
+        matches = re.findall(rf"(?:(\d+)[xX]\s*)?[*]*\s*{base}", reward_str, re.IGNORECASE)
+        total_to_add = 0
+        for match in matches:
+            total_to_add += int(match) if match else 1
+            
+        if total_to_add > 0:
             upgraded = upgrade_pack(base, is_cr)
-            packs_dict[upgraded] += 1
+            packs_dict[upgraded] += total_to_add
             if is_cr and upgraded != base and cr_detailed_logs is not None:
-                cr_detailed_logs.append(f"Đã nâng cấp 1 gói {base} → {upgraded} (Từ {source} vào {get_day_string(day)})")
+                cr_detailed_logs.append(f"Đã nâng cấp {total_to_add} gói {base} → {upgraded} (Từ {source} vào {get_day_string(day)})")
 
 def calculate_levels(days: int, levels_per_day: int) -> Dict[str, int]:
     total_levels = days * levels_per_day
