@@ -419,10 +419,13 @@ def render_analytics_tab() -> None:
             
             st.write("")
             def add_packs_to_cart(total_packs):
+                for pack in PACK_ORDER:
+                    st.session_state[f"cart_input_{pack}"] = 0
+                    st.session_state["cart_packs"][pack] = 0
                 for pack, count in total_packs.items():
                     if pack in PACK_ORDER and count > 0:
-                        st.session_state[f"cart_input_{pack}"] = st.session_state.get(f"cart_input_{pack}", 0) + count
-                        st.session_state["cart_packs"][pack] = st.session_state[f"cart_input_{pack}"]
+                        st.session_state[f"cart_input_{pack}"] = count
+                        st.session_state["cart_packs"][pack] = count
                 st.session_state["show_cart_success"] = True
                         
             st.button("📥 LƯU TOÀN BỘ PACKS VÀO GIỎ HÀNG", type="primary", on_click=add_packs_to_cart, args=(total,))
