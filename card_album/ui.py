@@ -107,7 +107,8 @@ def render_sidebar() -> str:
 
             def execute_cart():
                 success, message = open_bulk_packs(st.session_state, st.session_state["cart_packs"])
-                st.toast(message, icon="🎉" if success else "⚠️")
+                if not success:
+                    st.toast(message, icon="⚠️")
             st.button("MỞ TOÀN BỘ GIỎ HÀNG", type="primary", use_container_width=True, on_click=execute_cart)
 
         st.markdown("___________________")
