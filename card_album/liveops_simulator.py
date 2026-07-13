@@ -55,7 +55,7 @@ def calculate_levels(days: int, levels_per_day: int) -> Dict[str, int]:
         "super_hard": super_hard
     }
 
-def simulate_core_gameplay(total_levels: int, levels_per_day: int, cr_enabled: bool, cr_detailed_logs: list) -> Dict[str, Any]:
+def simulate_core_gameplay(total_levels: int, levels_per_day: int, cr_enabled: bool, cr_detailed_logs: list, core_enabled: bool = True) -> Dict[str, Any]:
     packs = {"Bronze": 0, "Bronze+": 0, "Emerald": 0, "Emerald+": 0}
     logs = []
     
@@ -69,15 +69,17 @@ def simulate_core_gameplay(total_levels: int, levels_per_day: int, cr_enabled: b
         is_cr = cr_enabled and is_card_rush_day(day)
         
         if level % 3 == 0 and level % 9 != 0:
-            if is_cr: 
+            if is_cr and core_enabled: 
                 bronze_plus += 1
                 cr_detailed_logs.append(f"Đã nâng cấp 1 gói Bronze → Bronze+ (Từ Cày Cuốc [Màn Hard] vào {get_day_string(day)})")
-            else: bronze_count += 1
+            elif core_enabled:
+                bronze_count += 1
         elif level % 9 == 0:
-            if is_cr: 
+            if is_cr and core_enabled: 
                 emerald_plus += 1
                 cr_detailed_logs.append(f"Đã nâng cấp 1 gói Emerald → Emerald+ (Từ Cày Cuốc [Màn Super Hard] vào {get_day_string(day)})")
-            else: emerald_count += 1
+            elif core_enabled:
+                emerald_count += 1
             
     packs["Bronze"] = bronze_count
     packs["Bronze+"] = bronze_plus
@@ -188,12 +190,13 @@ def simulate_liveops(days: int, levels_per_day: int, toggles: Dict[str, bool], i
     levels_info = calculate_levels(days, levels_per_day)
     total_levels = levels_info["total"]
     cr_enabled = toggles.get("card_rush", False)
+    core_enabled = toggles.get("core_gameplay", True)
     
     result_packs = {p: 0 for p in PACK_ORDER}
     all_logs = {}
     cr_detailed_logs = []
     
-    core = simulate_core_gameplay(total_levels, levels_per_day, cr_enabled, cr_detailed_logs)
+    core = simulate_core_gameplay(total_levels, levels_per_day, cr_enabled, cr_detailed_logs, core_enabled)
     for p, v in core["packs"].items(): result_packs[p] += v
     all_logs["core"] = core["logs"]
     

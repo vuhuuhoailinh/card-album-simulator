@@ -325,6 +325,11 @@ def render_analytics_tab() -> None:
         
         st.subheader("🎯 Bật/Tắt LiveOps")
         toggles = {}
+        toggles["core_gameplay"] = st.toggle(
+            "⚔️ Core Gameplay (Thưởng Level Khó)",
+            value=True,
+            help="Thưởng 1 Bronze khi thắng Hard, 1 Emerald khi thắng Super Hard."
+        )
         toggles["win_streak"] = st.toggle(
             "🔥 Win Streak (Mặc định tỉ lệ thắng 100%)", 
             value=True,
