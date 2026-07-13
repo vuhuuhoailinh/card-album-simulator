@@ -125,7 +125,8 @@ def render_config_tab():
             "Pity Incr": p.get("pity_increment", 0.0),
         }
         for i in range(1, 7):
-            row[f"Star_{i}"] = p["weights"].get(str(i), 0)
+            col_name = f"Star_{i}" if i < 6 else "Gold"
+            row[col_name] = p["weights"].get(str(i), 0)
         packs_data.append(row)
         
     df_packs = pd.DataFrame(packs_data)
@@ -140,7 +141,9 @@ def render_config_tab():
         "Pity Incr": st.column_config.NumberColumn("Pity Incr", help="% cơ hội cộng thêm khi đạt ngưỡng Pity (VD: 0.2 = +20%)."),
     }
     for i in range(1, 7):
-        col_config[f"Star_{i}"] = st.column_config.NumberColumn(f"Star_{i}", help=f"Trọng số bốc trúng độ hiếm {i}-Sao. Số càng to tỉ lệ càng cao.")
+        col_name = f"Star_{i}" if i < 6 else "Gold"
+        label_help = f"{i}-Sao" if i < 6 else "Thẻ VÀNG (6-Sao)"
+        col_config[col_name] = st.column_config.NumberColumn(col_name, help=f"Trọng số bốc trúng độ hiếm {label_help}. Số càng to tỉ lệ càng cao.")
         
     edited_packs = st.data_editor(df_packs, num_rows="fixed", hide_index=True, use_container_width=True, column_config=col_config, key="pack_config_editor")
 
@@ -188,7 +191,8 @@ def render_config_tab():
             p["pity_threshold"] = int(row["Pity Threshold"])
             p["pity_increment"] = float(row["Pity Incr"])
             for i in range(1, 7):
-                p["weights"][str(i)] = int(row[f"Star_{i}"])
+                col_name = f"Star_{i}" if i < 6 else "Gold"
+                p["weights"][str(i)] = int(row[col_name])
         st.session_state["config_packs"] = copy.deepcopy(st.session_state["draft_config_packs"])
         
         # Apply Rewards Config
