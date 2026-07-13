@@ -71,7 +71,7 @@ def render_config_tab():
 
     with st.expander("📖 Hướng dẫn cấu hình Hệ thống & Công thức Tỉ lệ", expanded=False):
         st.markdown("""
-        **1. Công thức tính cơ hội rớt Thẻ Mới (Cốt lõi của Game):**
+        **1. Công thức tính cơ hội rớt Thẻ Mới:**
         Game hiện tại áp dụng công thức sau để tính tỉ lệ ra thẻ mới:
         
         `New Card Ratio = (Remaining New/Total)^(x+y) + Pity`
@@ -79,7 +79,7 @@ def render_config_tab():
         - `y`: Base each pack (Cấu hình riêng trong từng gói thẻ giúp gói thẻ xịn dễ rớt thẻ mới hơn)
         
         **2. Giải thích Bảng Tỉ lệ Gói Thẻ (Packs Config):**
-        Bạn có thể rê chuột vào biểu tượng ❓ trên tiêu đề các cột trong bảng bên dưới để xem chú thích (tooltip) chi tiết.
+        Bạn có thể rê chuột vào tiêu đề các cột trong bảng bên dưới để xem chú thích (tooltip) chi tiết.
         
         **3. Chỉnh sửa Phần thưởng:**
         - Chỉ có thể chỉnh sửa cột **Reward** (Nội dung phần thưởng).
