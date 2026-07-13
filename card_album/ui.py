@@ -133,17 +133,21 @@ def inject_sidebar_toggle_style() -> None:
         }
         section[data-testid="stSidebar"] div[data-testid="stToggle"] label,
         section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
             align-items: center;
-            gap: 1.2rem;
+            gap: 0.8rem;
             min-height: 3.1rem;
             width: 100%;
         }
         section[data-testid="stSidebar"] div[data-testid="stToggle"] label p,
         section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 600;
             line-height: 1.2;
             text-transform: none;
+            white-space: nowrap;
         }
         section[data-testid="stSidebar"] div[data-testid="stToggle"] [role="switch"],
         section[data-testid="stSidebar"] div[data-testid="stCheckbox"] [role="switch"] {
