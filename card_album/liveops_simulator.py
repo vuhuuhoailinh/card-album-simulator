@@ -305,6 +305,14 @@ def simulate_liveops(days: int, levels_per_day: int, toggles: Dict[str, bool], i
     # Calculate Bonus Cards
     bonus_cards = (result_packs["Bronze+"] * 1) + (result_packs["Emerald+"] * 2) + (result_packs["Silver+"] * 2)
 
+    source_breakdown = {
+        "Core Gameplay": sum(core["packs"].values()),
+        "Win Streak": sum(ws["packs"].values()) if toggles.get("win_streak") else 0,
+        "Key Collection": sum(kc["packs"].values()) if toggles.get("key_collection") else 0,
+        "Master Pass": sum(mp["packs"].values()) if toggles.get("master_pass") else 0,
+        "IAP / Mua sắm": sum(iap_summary.values())
+    }
+
     return {
         "assumptions": assumptions,
         "levels_info": levels_info,
@@ -312,5 +320,6 @@ def simulate_liveops(days: int, levels_per_day: int, toggles: Dict[str, bool], i
         "iap_packs": iap_summary,
         "total_packs": result_packs,
         "total_spent": total_spent,
-        "bonus_cards": bonus_cards
+        "bonus_cards": bonus_cards,
+        "source_breakdown": source_breakdown
     }

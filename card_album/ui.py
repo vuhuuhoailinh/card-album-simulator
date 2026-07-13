@@ -57,12 +57,16 @@ def run_app() -> None:
         if st.button("i", type="primary", help="Infomation"):
             show_logic_dialog()
     
-    tab_manual, tab_auto, tab_config = st.tabs(["🎮 Mở Pack", "📈 LiveOps Economy Simulator", "⚙️ Economy Tuning"])
+    tab_manual, tab_mc, tab_auto, tab_config = st.tabs(["🎮 Mở Pack", "📊 Monte Carlo Simulator", "📈 LiveOps Economy", "⚙️ Economy Tuning"])
     
     with tab_manual:
         render_album_dashboard()
         st.divider()
         render_main_content(selected_pack)
+        
+    with tab_mc:
+        from .monte_carlo import render_monte_carlo_tab
+        render_monte_carlo_tab()
         
     with tab_auto:
         render_analytics_tab()
@@ -86,24 +90,25 @@ def render_sidebar() -> str:
             open_pack(st.session_state, selected_pack)
             st.rerun()
 
-        st.subheader("📦 Mở Nhiều Pack")
-        with st.expander("⚙️ Cài đặt số lượng Packs", expanded=False):
-            bulk_inputs = {}
+        st.subheader("🛒 Giỏ Hàng (Cart)")
+        with st.expander("📦 Xem / Chỉnh sửa Giỏ Hàng", expanded=False):
             for pack in PACK_ORDER:
-                bulk_inputs[pack] = st.number_input(
+                if f"cart_input_{pack}" not in st.session_state:
+                    st.session_state[f"cart_input_{pack}"] = st.session_state["cart_packs"].get(pack, 0)
+                
+                st.number_input(
                     f"{PACK_ICONS[pack]} {pack}",
                     min_value=0,
-                    max_value=1000,
-                    value=0,
+                    max_value=10000,
                     step=1,
-                    key=f"bulk_{pack}",
+                    key=f"cart_input_{pack}",
                 )
+                st.session_state["cart_packs"][pack] = st.session_state[f"cart_input_{pack}"]
 
-            if st.button("BẮT ĐẦU MỞ HÀNG LOẠT", type="primary", use_container_width=True):
-                success, message = open_bulk_packs(st.session_state, bulk_inputs)
+            def execute_cart():
+                success, message = open_bulk_packs(st.session_state, st.session_state["cart_packs"])
                 st.toast(message, icon="🎉" if success else "⚠️")
-                if success:
-                    st.rerun()
+            st.button("MỞ TOÀN BỘ GIỎ HÀNG", type="primary", use_container_width=True, on_click=execute_cart)
 
         st.markdown("___________________")
         if st.button("🗑️ Reset Dữ Liệu Mở Pack", use_container_width=True):
@@ -406,8 +411,38 @@ def render_analytics_tab() -> None:
             c7.metric(f"{PACK_ICONS['Rainbow']} Rainbow", total["Rainbow"])
             c8.metric("💸 Tổng chi (IAP)", f"${res.get('total_spent', 0.0):.2f}")
             
+            st.write("")
+            def add_packs_to_cart(total_packs):
+                for pack, count in total_packs.items():
+                    if pack in PACK_ORDER and count > 0:
+                        st.session_state[f"cart_input_{pack}"] = st.session_state.get(f"cart_input_{pack}", 0) + count
+                        st.session_state["cart_packs"][pack] = st.session_state[f"cart_input_{pack}"]
+                st.session_state["show_cart_success"] = True
+                        
+            st.button("📥 LƯU TOÀN BỘ PACKS VÀO GIỎ HÀNG", type="primary", on_click=add_packs_to_cart, args=(total,))
+            
+            if st.session_state.get("show_cart_success"):
+                st.success("✅ Đã thêm Packs vào Giỏ Hàng ở Sidebar! Bạn có thể sang tab Monte Carlo để mô phỏng.")
+                st.session_state["show_cart_success"] = False
+            
             st.divider()
             st.subheader("🔎 Chi tiết Nguồn nhận & Phần thưởng khác")
+            
+            import pandas as pd
+            import altair as alt
+            source_df = pd.DataFrame(list(res["source_breakdown"].items()), columns=["Source", "Total"])
+            source_df = source_df[source_df["Total"] > 0]
+            if not source_df.empty:
+                chart = alt.Chart(source_df).mark_arc().encode(
+                    theta=alt.Theta(field="Total", type="quantitative"),
+                    color=alt.Color(field="Source", type="nominal", legend=alt.Legend(title="Nguồn", orient="right")),
+                    tooltip=["Source", "Total"]
+                ).properties(height=300)
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.info("Chưa có dữ liệu nguồn nhận")
+                
+            st.write("")
             
             with st.expander("⚔️ Thắng Level Hard/Super Hard (Core Gameplay)"):
                 for l in res["logs"]["core"]: st.markdown(f"- {l}")
@@ -436,15 +471,6 @@ def render_analytics_tab() -> None:
                         for l in res["logs"]["card_rush"]: st.markdown(f"- {l}")
                     else:
                         st.markdown("- Chưa có thông tin Card Rush.")
-                
-            st.divider()
-            st.subheader("🎲 Mở thử đống Pack này!")
-            if st.button("Mở hàng loạt (Feed into Gacha)"):
-                bulk_inputs = {k: v for k, v in total.items() if v > 0}
-                success, message = open_bulk_packs(st.session_state, bulk_inputs)
-                st.toast(message, icon="🎉" if success else "⚠️")
-                if success:
-                    st.rerun()
 
 @st.dialog("📖 TỔNG QUAN LOGIC HỆ THỐNG", width="large")
 def show_logic_dialog():

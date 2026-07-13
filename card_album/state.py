@@ -45,6 +45,11 @@ def ensure_album_state(session_state) -> None:
         session_state["grand_album_enabled"] = True
     if "new_card_formula_type" not in session_state:
         session_state["new_card_formula_type"] = "simple"
+    if "cart_packs" not in session_state:
+        session_state["cart_packs"] = fresh_pack_counts()
+    else:
+        for pack in PACK_ORDER:
+            session_state["cart_packs"].setdefault(pack, 0)
 
 
 def reset_progress(session_state) -> None:
