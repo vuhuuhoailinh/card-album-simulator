@@ -448,31 +448,35 @@ def render_analytics_tab() -> None:
 
 @st.dialog("📖 TỔNG QUAN LOGIC HỆ THỐNG", width="large")
 def show_logic_dialog():
-    st.markdown('''
+    st.markdown("""
 ### 1. Cơ Chế Gacha Cơ Bản & Pity (Bảo hiểm)
-- **Tỉ lệ rớt (Drop Rates):** Mỗi gói thẻ có số lượng thẻ và tỉ lệ rớt các độ hiếm khác nhau. Tỉ lệ này tự động trượt theo số lượng thẻ bạn còn thiếu (càng gần full album, tỉ lệ rớt thẻ Mới càng thấp). Bạn có thể xem và chỉnh sửa Tỉ Lệ Động ở tab `⚙️ Economy Tuning`.
-- **Thẻ Bảo Hiểm:** Mỗi gói đều cam kết rớt ít nhất 1 thẻ từ 1 độ hiếm cụ thể trở lên (Ví dụ gói Emerald chắc chắn có ít nhất 1 thẻ 2-Sao).
+- **Tỉ lệ Rớt (Drop Rates) vs Tỉ lệ Thẻ Mới:** 
+  - **Tỉ lệ rớt Độ Hiếm** (VD: 28% ra 1-Sao, 1% ra Vàng) là **CỐ ĐỊNH** và luôn không đổi trong suốt quá trình mở gói.
+  - **Tỉ lệ Thẻ MỚI (New Chance)**: Là tỉ lệ để lá thẻ vừa rớt ra đó rơi vào lá bạn CHƯA CÓ. Tỉ lệ này mới là thứ tự động trượt giảm dần khi Album của bạn ngày càng đầy. (Càng gần full, tỉ lệ ra thẻ trùng càng cao).
+  - *Lưu ý:* Bạn có thể tuỳ chỉnh toàn bộ trọng số (Weights), Ngưỡng Pity, và cả **Công thức trượt Tỉ lệ** (Curve/Linear) ở tab `⚙️ Economy Tuning`.
+- **Thẻ Bảo Hiểm (Guaranteed):** Mỗi gói đều cam kết rớt ít nhất 1 thẻ từ 1 độ hiếm cụ thể trở lên (Ví dụ gói Emerald chắc chắn có ít nhất 1 thẻ 2-Sao).
 - **Cơ Chế Pity (Đếm Tạch):** 
-  - Hoạt động **độc lập** cho TỪNG LOẠI GÓI THẺ. (Tạch Silver không cộng dồn cho Amethyst).
-  - Mỗi khi mở một gói và không ra bất kỳ thẻ **NEW** nào, số lần "Tạch" của gói đó tăng lên 1.
+  - Hoạt động **độc lập** cho TỪNG LOẠI GÓI THẺ. (Pity của Silver KHÔNG cộng dồn hay chia sẻ cho Amethyst).
+  - Mỗi khi mở một gói mà không ra bất kỳ thẻ **NEW** nào, số lần "Tạch" của gói đó tăng lên 1.
   - Khi tạch đến ngưỡng quy định, gói đó sẽ được **buff thêm % Tỉ lệ ra Thẻ Mới** ở lần mở sau. (Vd: Gói Silver tạch 3 lần sẽ buff +20%).
-- **Ngắt Pity Giữa Chừng (Mid-Pack Reset):** Tuy % Pity được buff cho *toàn bộ* các thẻ trong gói, nhưng ngay khoảnh khắc thẻ đầu tiên nổ ra chữ **NEW**, lượng % buff này sẽ lập tức bốc hơi (về 0%) để các thẻ còn lại không bị lạm phát phi lý.
+- **Ngắt Pity Giữa Chừng (Mid-Pack Reset):** Tỉ lệ buff Pity được cộng thẳng vào từng lá bài khi nó được lật lên. Ngay khoảnh khắc lá bài đầu tiên nổ ra chữ **NEW**, lượng % buff này sẽ **lập tức bốc hơi (về 0%)**. Các lá bài lật sau đó trong cùng gói sẽ trở về tỉ lệ gốc, nhằm chống lạm phát thẻ mới.
 
 ### 2. Rainbow Pack & 5 Gói Tân Thủ
 - **Tân Thủ:** 5 gói thẻ đầu tiên bạn nhận được trong Mùa (từ bất kỳ nguồn nào) sẽ được hệ thống buff **100% rớt toàn Thẻ Mới**.
-- **Rainbow Pack:** Gói thẻ đặc quyền có 6 thẻ, trong đó chắc chắn 100% rớt 1 Thẻ Mới. Thuật toán sẽ luôn ưu tiên rớt **Thẻ Vàng (6-Sao)** trước. Nếu thẻ Vàng đã đầy, hệ thống sẽ rớt ngẫu nhiên các độ hiếm còn thiếu khác.
+- **Rainbow Pack:** Gói thẻ đặc quyền có 6 thẻ, trong đó chắc chắn rớt 1 Thẻ Mới (Wild Card). Thuật toán sẽ luôn ưu tiên rớt **Thẻ Vàng (6-Sao)** trước. 
+  - *Clarification:* Trong game gốc, nếu Vàng đã full, Wild Card sẽ ưu tiên các "Bộ (Sets) chỉ còn thiếu 1 lá". Do Simulator này chỉ track tiến độ theo Độ Hiếm, hệ thống sẽ giả lập bằng cách rớt ngẫu nhiên 1 Thẻ Mới từ các độ hiếm còn thiếu.
 
 ### 3. Grand Album & Thẻ Trùng (Duplicated)
 - **Hoàn thành Album:** Sau khi sưu tập đủ 135 thẻ, bạn sẽ hoàn thành vòng Album và được thăng cấp sang "Grand Album".
-- **Luật Reset:** Khi thăng cấp, kho thẻ sẽ **bị Reset về 0**, nhưng lượng **Sao (Stars)** tích lũy được giữ nguyên vẹn.
-- **Thẻ Trùng:** Mọi thẻ trùng lặp khi quay ra sẽ tự động phân rã thành **Sao**. Thẻ càng hiếm, số Sao thu được càng cao (Từ 1 Sao lên tới 15 Sao).
+- **Luật Reset:** Khi thăng cấp, kho thẻ sẽ **bị Reset toàn bộ về 0**, nhưng lượng **Sao (Stars)** bạn tích lũy được sẽ **giữ nguyên vẹn** (Dùng để mua các rương Out of Coins sau này).
+- **Thẻ Trùng:** Mọi thẻ trùng lặp quay ra sẽ tự động phân rã thành **Sao**. Thẻ càng hiếm, số Sao thu được càng cao (Từ 1 Sao cho thẻ 1-Sao lên tới 15 Sao cho Thẻ Vàng).
 
 ### 4. Hệ Sinh Thái LiveOps (Sự kiện & Nền kinh tế)
-Trong tab `📈 LiveOps Simulator`, bạn có thể giả lập hành trình cày cuốc theo ngày thông qua các hệ thống sau:
-- **Core Gameplay (Vượt Ải):** Thắng màn Hard được thưởng gói Bronze, thắng Super Hard thưởng gói Emerald.
+Trong tab `📈 LiveOps Simulator`, hệ thống sử dụng thuật toán giả lập để ước tính số Pack bạn nhận được dựa trên giả định bạn chơi hoàn hảo (perfect play) theo số ngày và số level đã cấu hình:
+- **Core Gameplay (Vượt Ải):** Cứ thắng màn Hard sẽ thưởng gói Bronze, thắng Super Hard thưởng gói Emerald.
 - **Win Streak:** Giữ chuỗi thắng liên tiếp để càn quét các phần thưởng dọc đường (Gói Bronze đến tận Ruby).
-- **Master Pass (Battle Pass):** Thu thập token từ các màn chơi. Nhánh Premium (trả phí) sẽ cung cấp số lượng Pack khổng lồ.
+- **Master Pass (Battle Pass):** Thu thập token từ các màn chơi. Nhánh Premium (trả phí) sẽ cung cấp số lượng Pack khổng lồ, là nguồn thẻ lớn nhất game.
 - **Key Collection:** Cày chìa khóa theo tiến độ để mở Rương chặng.
-- **Chain Offer & IAP:** Các sự kiện bán gói ưu đãi theo chuỗi (nhận phần đầu miễn phí, các phần sau dùng tiền thật để tối đa hoá thẻ cao cấp).
-- **⚡ Card Rush:** Sự kiện đặc biệt xuất hiện vào các ngày cuối tuần hoặc thứ 4. Khi kích hoạt, các gói thẻ thường (Bronze, Emerald, Silver) sẽ thức tỉnh thành dạng **Plus (+)**, nhồi thêm số lượng thẻ rớt ra nhưng vẫn giữ nguyên tỉ lệ hiếm, giúp bạn sưu tập thần tốc!
-    ''')
+- **Chain Offer & IAP:** Các sự kiện bán gói ưu đãi theo chuỗi. Simulator cho phép bạn giả lập "tiêu tiền" vào các mốc Chain để xem lợi nhuận thu về so với các Bundle Shop bình thường.
+- **⚡ Card Rush:** Khi sự kiện này kích hoạt, các gói thẻ thường sẽ thức tỉnh thành dạng **Plus (+)**. Chúng sẽ **nhồi thêm số lượng thẻ vật lý** vào gói (VD: Bronze từ 2 lên 3 thẻ, Emerald từ 3 lên 4 thẻ...) nhưng vẫn giữ nguyên tỉ lệ hiếm. Điều này giúp bạn quay được nhiều thẻ hơn trong một pack.
+    """)
