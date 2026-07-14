@@ -106,18 +106,43 @@ def render_monte_carlo_results(res, iterations, total_cart_packs):
     
     # Charts
     st.info("💡 **Lưu ý:** Để biểu đồ hiển thị chuẩn xác và không bị gãy đoạn do cơ chế Reset của Grand Album, **Số Thẻ Cuối Cùng** sẽ được cộng dồn liên tục nếu bạn vượt quá 135 thẻ. (VD: Nếu bạn full album bị reset về 0, rồi bóc thêm được 10 thẻ nữa, hệ thống sẽ ghi nhận bạn có 145 thẻ).")
+    
+    def bin_data(series, num_bins=20):
+        min_val = int(series.min())
+        max_val = int(series.max())
+        if max_val == min_val:
+            return pd.Series([str(min_val)] * len(series), index=series.index)
+            
+        step = max(1, (max_val - min_val) // num_bins + 1)
+        bins = list(range(min_val, max_val + step + 1, step))
+        labels = []
+        for i in range(len(bins)-1):
+            start = bins[i]
+            end = bins[i+1] - 1
+            if start == end:
+                labels.append(str(start))
+            else:
+                labels.append(f"{start} - {end}")
+        return pd.cut(series, bins=bins, right=False, labels=labels, include_lowest=True)
+
+    df["cards_group"] = bin_data(df["cards"], 20)
+    df["stars_group"] = bin_data(df["stars"], 20)
+    
+    cards_summary = df.groupby("cards_group", observed=True).size().reset_index(name="count")
+    stars_summary = df.groupby("stars_group", observed=True).size().reset_index(name="count")
+
     st.subheader("Phân bổ Số lượng Thẻ thu thập được")
-    chart_cards = alt.Chart(df).mark_bar(opacity=0.8, color="#4CAF50").encode(
-        alt.X("cards", bin=alt.Bin(maxbins=30), title="Số Thẻ Cuối Cùng"),
-        alt.Y('count()', title="Số Lần Lặp (Tần suất)"),
-        tooltip=['count()']
+    chart_cards = alt.Chart(cards_summary).mark_bar(opacity=0.8, color="#4CAF50").encode(
+        alt.X("cards_group:O", title="Số Thẻ Cuối Cùng", axis=alt.Axis(labelAngle=-45)),
+        alt.Y('count:Q', title="Số Lần Lặp (Tần suất)"),
+        tooltip=[alt.Tooltip('cards_group:O', title='Số Thẻ'), alt.Tooltip('count:Q', title='Số Lần Lặp')]
     )
     st.altair_chart(chart_cards, use_container_width=True)
     
     st.subheader("Phân bổ Số Sao dư thừa")
-    chart_stars = alt.Chart(df).mark_bar(opacity=0.8, color="#FFC107").encode(
-        alt.X("stars", bin=alt.Bin(maxbins=30), title="Tổng số Sao"),
-        alt.Y('count()', title="Số Lần Lặp (Tần suất)"),
-        tooltip=['count()']
+    chart_stars = alt.Chart(stars_summary).mark_bar(opacity=0.8, color="#FFC107").encode(
+        alt.X("stars_group:O", title="Tổng số Sao", axis=alt.Axis(labelAngle=-45)),
+        alt.Y('count:Q', title="Số Lần Lặp (Tần suất)"),
+        tooltip=[alt.Tooltip('stars_group:O', title='Tổng số Sao'), alt.Tooltip('count:Q', title='Số Lần Lặp')]
     )
     st.altair_chart(chart_stars, use_container_width=True)
