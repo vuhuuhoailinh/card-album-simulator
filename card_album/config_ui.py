@@ -13,7 +13,7 @@ def init_draft_config():
     if "draft_new_card_formula_type" not in st.session_state:
         st.session_state["draft_new_card_formula_type"] = st.session_state.get("new_card_formula_type", "simple")
     if "draft_new_card_power" not in st.session_state:
-        st.session_state["draft_new_card_power"] = st.session_state.get("new_card_power", 1.0)
+        st.session_state["draft_new_card_power"] = st.session_state.get("new_card_power", 3.0)
 
 def clear_draft_config():
     keys_to_clear = [

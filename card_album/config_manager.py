@@ -34,7 +34,7 @@ def get_default_config() -> dict:
             "key_collection_rewards": copy.deepcopy(KEY_COLLECTION_REWARDS),
         },
         "system": {
-            "new_card_power": 1.0,
+            "new_card_power": 3.0,
             "new_card_formula_type": "document"
         }
     }
@@ -58,7 +58,7 @@ def load_config_to_state(session_state, config_dict=None) -> None:
     }
     
     if "system" in config_dict:
-        session_state["new_card_power"] = config_dict["system"].get("new_card_power", 1.0)
+        session_state["new_card_power"] = config_dict["system"].get("new_card_power", 3.0)
         session_state["new_card_formula_type"] = config_dict["system"].get("new_card_formula_type", "simple")
 
 
@@ -68,7 +68,7 @@ def export_config_to_json(session_state) -> str:
         "packs": session_state["config_packs"],
         "rewards": session_state["config_rewards"],
         "system": {
-            "new_card_power": session_state.get("new_card_power", 1.0),
+            "new_card_power": session_state.get("new_card_power", 3.0),
             "new_card_formula_type": session_state.get("new_card_formula_type", "simple")
         }
     }

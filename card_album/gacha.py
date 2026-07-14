@@ -53,7 +53,7 @@ def calculate_new_chance(session_state, rarity: int, pack_type: str) -> float:
     base_new = (max_cards - cards_owned) / max_cards
     
     formula_type = session_state.get("new_card_formula_type", "document")
-    power = session_state.get("new_card_power", 1.0)
+    power = session_state.get("new_card_power", 3.0)
     
     if formula_type == "document":
         pack_config = session_state["config_packs"].get(pack_type, {})
