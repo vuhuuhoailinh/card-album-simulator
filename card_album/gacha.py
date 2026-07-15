@@ -105,7 +105,8 @@ def open_pack(session_state, pack_type: str) -> None:
         status, final_rarity = roll_card(session_state, rarity, current_pity_bonus, pack_type)
         if status == "NEW":
             got_new = True
-            current_pity_bonus = 0.0 # Reset immediately when a new card is chosen
+            if session_state.get("total_packs", 0) > 5:
+                current_pity_bonus = 0.0 # Reset immediately when a new card is chosen
         raw_results.append((status, final_rarity))
 
     is_rainbow = (pack_type == "Rainbow")

@@ -60,12 +60,14 @@ def render_config_tab():
         uploaded_file = st.file_uploader("📂 Tải lên (Import JSON)", type=["json"], label_visibility="collapsed")
         if uploaded_file is not None:
             content = uploaded_file.getvalue().decode("utf-8")
-            if import_config_from_json(st.session_state, content):
-                clear_draft_config()
-                st.success("Tải Config thành công!")
-                st.rerun()
-            else:
-                st.error("File Config không hợp lệ!")
+            if st.session_state.get("last_uploaded_json") != content:
+                st.session_state["last_uploaded_json"] = content
+                if import_config_from_json(st.session_state, content):
+                    clear_draft_config()
+                    st.toast("✅ Tải Config thành công!")
+                    st.rerun()
+                else:
+                    st.error("File Config không hợp lệ!")
 
     st.divider()
 
@@ -75,14 +77,21 @@ def render_config_tab():
         Game hiện tại áp dụng công thức sau để tính tỉ lệ ra thẻ mới:
         
         `New Card Ratio = (Remaining New/Total)^(x+y) + Pity`
-        - `x`: Base for all pack, default = 1
+        - `x`: Base for all pack, default = 3
         - `y`: Base each pack (Cấu hình riêng trong từng gói thẻ giúp gói thẻ xịn dễ rớt thẻ mới hơn)
         
         **2. Giải thích Bảng Tỉ lệ Gói Thẻ (Packs Config):**
-        Bạn có thể rê chuột vào tiêu đề các cột trong bảng bên dưới để xem chú thích (tooltip) chi tiết.
+        - Bạn hoàn toàn có thể **chỉnh sửa tỉ lệ rớt thẻ** của từng Gói Thẻ ngay trong bảng bên dưới.
+        - Tỉ lệ rớt được hệ thống tính toán dựa trên **Trọng số (Weights)** thay vì % tuyệt đối. (Bạn có thể rê chuột vào tiêu đề cột để xem chú thích).
+        - **Quy tắc tính:** Cơ hội rớt của một độ hiếm = (Trọng số của độ hiếm đó) / (Tổng trọng số của tất cả các độ hiếm).
+        - **Ví dụ rõ ràng:**
+          > Nếu Gói Bronze được cấu hình Trọng số là: 1-Sao: `35`, 2-Sao: `26`, 3-Sao: `20`, 4-Sao: `11`, 5-Sao: `7`, Gold: `1`.
+          > Khi đó, Tổng trọng số = 35 + 26 + 20 + 11 + 7 + 1 = 100.
+          > 👉 Tỉ lệ rớt thẻ 1-Sao sẽ là `35 / 100 = 35%`. Tỉ lệ thẻ Gold là `1 / 100 = 1%`.
+          > Nếu bạn sửa số thẻ Gold từ `1` thành `100`, Tổng trọng số sẽ tăng lên thành 199. Lúc này tỉ lệ rớt thẻ Gold cực cao, chiếm `100 / 199 ≈ 50%`!
         
-        **3. Chỉnh sửa Phần thưởng:**
-        - Chỉ có thể chỉnh sửa cột **Reward** (Nội dung phần thưởng).
+        **3. Bảng Phần thưởng (Rewards):**
+        - Bảng phần thưởng bao gồm các mốc thưởng trong Master Pass, Win Streak, và Key Collection (Chỉ đọc).
         - Hệ thống sẽ tự động quét từ khóa `Pack` và gắn icon 📦 để bạn dễ nhận biết đâu là mốc nhận thẻ.
         
         **4. Cơ chế Bảo hiểm (Pity System):**
@@ -150,29 +159,22 @@ def render_config_tab():
     st.divider()
 
     # ----------------- REWARDS CONFIG -----------------
-    def render_reward_editor(title: str, config_key: str, key_col: str):
+    def render_reward_viewer(title: str, config_key: str, key_col: str):
         st.subheader(title)
-        data_dict = st.session_state["draft_config_rewards"][config_key]
+        data_dict = st.session_state["config_rewards"][config_key]
         df = pd.DataFrame(list(data_dict.items()), columns=[key_col, "Reward"])
         # Add visual helper column for packs
         df["Có Pack?"] = df["Reward"].apply(lambda x: "📦" if "Pack" in str(x) else "")
         
-        # Configure columns so key_col and Có Pack? are non-editable
-        reward_col_config = {
-            key_col: st.column_config.NumberColumn(key_col, disabled=True),
-            "Có Pack?": st.column_config.TextColumn("Có Pack?", disabled=True)
-        }
-        
-        edited_df = st.data_editor(df, num_rows="fixed", hide_index=True, use_container_width=True, column_config=reward_col_config, key=f"reward_editor_{config_key}")
-        return edited_df
+        st.dataframe(df, hide_index=True, use_container_width=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        edited_mp_free = render_reward_editor("🎁 Master Pass (Free)", "master_pass_free", "Level")
-        edited_ws = render_reward_editor("🔥 Win Streak", "win_streak_rewards", "Wins")
+        render_reward_viewer("🎁 Master Pass (Free)", "master_pass_free", "Level")
+        render_reward_viewer("🔥 Win Streak", "win_streak_rewards", "Wins")
     with c2:
-        edited_mp_prem = render_reward_editor("👑 Master Pass (Premium)", "master_pass_premium", "Level")
-        edited_kc = render_reward_editor("🔑 Key Collection", "key_collection_rewards", "Stage")
+        render_reward_viewer("👑 Master Pass (Premium)", "master_pass_premium", "Level")
+        render_reward_viewer("🔑 Key Collection", "key_collection_rewards", "Stage")
 
     if applied:
         # Apply System Config
@@ -195,12 +197,7 @@ def render_config_tab():
                 p["weights"][str(i)] = int(row[col_name])
         st.session_state["config_packs"] = copy.deepcopy(st.session_state["draft_config_packs"])
         
-        # Apply Rewards Config
-        st.session_state["draft_config_rewards"]["master_pass_free"] = {int(row["Level"]): row["Reward"] for _, row in edited_mp_free.iterrows()}
-        st.session_state["draft_config_rewards"]["win_streak_rewards"] = {int(row["Wins"]): row["Reward"] for _, row in edited_ws.iterrows()}
-        st.session_state["draft_config_rewards"]["master_pass_premium"] = {int(row["Level"]): row["Reward"] for _, row in edited_mp_prem.iterrows()}
-        st.session_state["draft_config_rewards"]["key_collection_rewards"] = {int(row["Stage"]): row["Reward"] for _, row in edited_kc.iterrows()}
-        st.session_state["config_rewards"] = copy.deepcopy(st.session_state["draft_config_rewards"])
+        # Removed Rewards Config application because they are now read-only
         
         st.toast("✅ Cấu hình đã được lưu thành công!")
         st.session_state["show_config_success"] = True

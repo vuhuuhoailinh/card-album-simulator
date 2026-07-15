@@ -502,7 +502,7 @@ def show_logic_dialog():
   - `New Card Ratio = (Remaining New / Total) ^ (x + y) + Pity`
   - `x`: Hệ số Khó chung (Càng cao càng khó ra thẻ mới, tuỳ chỉnh trong Tuning).
   - `y`: Hệ số Khó riêng của từng gói (Gói xịn có `y` âm giúp dễ rớt thẻ mới hơn).
-- **Thẻ Bảo Hiểm (Guaranteed):** Mỗi gói đều cam kết rớt ít nhất 1 thẻ từ 1 độ hiếm cụ thể trở lên (Ví dụ gói Emerald chắc chắn có ít nhất 1 thẻ 2-Sao).
+- **Thẻ Bảo Hiểm (Guaranteed):** Mỗi gói đều cam kết rớt 1 thẻ ở ĐÚNG độ hiếm cụ thể (Ví dụ gói Emerald chắc chắn có 1 thẻ 2-Sao).
 - **Cơ Chế Pity (Đếm Tạch):** 
   - Hoạt động **độc lập** cho TỪNG LOẠI GÓI THẺ. (Pity của Silver KHÔNG chia sẻ cho Amethyst).
   - Mỗi khi mở một gói mà không ra bất kỳ thẻ **NEW** nào, số lần "Tạch" của gói đó tăng lên 1.
@@ -521,10 +521,10 @@ def show_logic_dialog():
 
 ### 4. Hệ Sinh Thái LiveOps (Sự kiện & Nền kinh tế)
 Trong tab `📈 LiveOps Simulator`, hệ thống sử dụng thuật toán giả lập để ước tính số Pack bạn nhận được dựa trên giả định bạn chơi hoàn hảo (perfect play) theo số ngày và số level đã cấu hình:
-- **Core Gameplay (Vượt Ải):** Cứ thắng màn Hard sẽ thưởng gói Bronze, thắng Super Hard thưởng gói Emerald.
+- **Core Gameplay (Thắng màn Khó):** Cứ thắng màn Hard sẽ thưởng gói Bronze, thắng Super Hard thưởng gói Emerald.
 - **Win Streak:** Giữ chuỗi thắng liên tiếp để càn quét các phần thưởng dọc đường.
 - **Master Pass (Battle Pass):** Thu thập token từ các màn chơi. Nhánh Premium (trả phí) sẽ cung cấp số lượng Pack khổng lồ, là nguồn thẻ lớn nhất game.
 - **Key Collection:** Cày chìa khóa theo tiến độ để mở Rương chặng.
 - **Chain Offer & IAP:** Các sự kiện bán gói ưu đãi theo chuỗi. Simulator cho phép bạn giả lập "tiêu tiền" vào các mốc Chain để xem lợi nhuận thu về so với các Bundle Shop bình thường.
-- **⚡ Card Rush:** Khi sự kiện này kích hoạt, các gói thẻ thường sẽ thức tỉnh thành dạng **Plus (+)**. Chúng sẽ **nhồi thêm số lượng thẻ vật lý** vào gói (VD: Bronze từ 2 lên 3 thẻ, Emerald từ 3 lên 5 thẻ, Silver từ 4 lên 6 thẻ...) nhưng vẫn giữ nguyên tỉ lệ hiếm. Điều này giúp bạn quay được nhiều thẻ hơn trong một pack.
+- **⚡ Card Rush:** Khi sự kiện này kích hoạt, các gói thẻ thường sẽ chuyển thành **Plus (+), thêm 50% số lượng thẻ** vào từng gói (VD: Bronze từ 2 lên 3 thẻ, Emerald từ 3 lên 5 thẻ, Silver từ 4 lên 6 thẻ...).
     """)
