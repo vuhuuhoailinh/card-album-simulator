@@ -320,8 +320,13 @@ def render_analytics_tab() -> None:
     
     with col1:
         st.subheader("🗓️ Thông số Cày cuốc")
-        days = st.number_input("Số ngày chơi (Days)", min_value=1, max_value=60, value=60)
-        levels_per_day = st.number_input("Số Level qua mỗi ngày", min_value=1, max_value=100, value=5)
+        days = st.number_input("Số Ngày (Mùa giải)", min_value=1, max_value=365, value=60)
+        
+        col_lvl1, col_lvl2 = st.columns(2)
+        with col_lvl1:
+            levels_per_weekday = st.number_input("Level chơi trong tuần (T2-T5)", min_value=0, max_value=100, value=5)
+        with col_lvl2:
+            levels_per_weekend = st.number_input("Level chơi cuối tuần (T6-CN)", min_value=0, max_value=100, value=15)
         
         st.subheader("🎯 Bật/Tắt LiveOps")
         toggles = {}
@@ -330,11 +335,8 @@ def render_analytics_tab() -> None:
             value=True,
             help="Thưởng 1 Bronze khi thắng Hard, 1 Emerald khi thắng Super Hard."
         )
-        toggles["win_streak"] = st.toggle(
-            "🔥 Win Streak (Mặc định tỉ lệ thắng 100%)", 
-            value=True,
-            help="Nhận phần thưởng khi đạt các chuỗi thắng liên tiếp (Assume 1 lần/mùa)."
-        )
+        toggles["win_streak"] = st.toggle("Sự kiện Win Streak", value=True,
+            help="Nhận phần thưởng khi đạt các chuỗi thắng liên tiếp (Sự kiện diễn ra từ T6-CN hàng tuần, reset mỗi đầu sự kiện).")
         toggles["key_collection"] = st.toggle(
             "🔑 Key Collection", 
             value=True,
@@ -383,7 +385,7 @@ def render_analytics_tab() -> None:
             
     with col2:
         if st.button("🧮 TÍNH TOÁN PHẦN THƯỞNG", type="primary", use_container_width=True):
-            res = simulate_liveops(days, levels_per_day, toggles, iap_selections, st.session_state["config_rewards"])
+            res = simulate_liveops(days, levels_per_weekday, levels_per_weekend, toggles, iap_selections, st.session_state["config_rewards"])
             st.session_state["liveops_result"] = res
             
         if "liveops_result" in st.session_state:
@@ -521,10 +523,10 @@ def show_logic_dialog():
 
 ### 4. Hệ Sinh Thái LiveOps (Sự kiện & Nền kinh tế)
 Trong tab `📈 LiveOps Simulator`, hệ thống sử dụng thuật toán giả lập để ước tính số Pack bạn nhận được dựa trên giả định bạn chơi hoàn hảo (perfect play) theo số ngày và số level đã cấu hình:
-- **Core Gameplay (Thắng màn Khó):** Cứ thắng màn Hard sẽ thưởng gói Bronze, thắng Super Hard thưởng gói Emerald.
-- **Win Streak:** Giữ chuỗi thắng liên tiếp để càn quét các phần thưởng dọc đường.
-- **Master Pass (Battle Pass):** Thu thập token từ các màn chơi. Nhánh Premium (trả phí) sẽ cung cấp số lượng Pack khổng lồ, là nguồn thẻ lớn nhất game.
-- **Key Collection:** Cày chìa khóa theo tiến độ để mở Rương chặng.
-- **Chain Offer & IAP:** Các sự kiện bán gói ưu đãi theo chuỗi. Simulator cho phép bạn giả lập "tiêu tiền" vào các mốc Chain để xem lợi nhuận thu về so với các Bundle Shop bình thường.
-- **⚡ Card Rush:** Khi sự kiện này kích hoạt, các gói thẻ thường sẽ chuyển thành **Plus (+), thêm 50% số lượng thẻ** vào từng gói (VD: Bronze từ 2 lên 3 thẻ, Emerald từ 3 lên 5 thẻ, Silver từ 4 lên 6 thẻ...).
+- **Core Gameplay (Thắng màn Khó):** Cứ thắng màn Hard sẽ thưởng gói Bronze, thắng Super Hard thưởng gói Emerald. Tiến trình Level diễn ra theo chu kỳ cố định: N-N-H, N-N-H, N-N-SH (sau 2 Normal tới 1 Hard, sau 2 Hard tới 1 Super Hard).
+- **Win Streak:** Giữ chuỗi thắng liên tiếp để càn quét các phần thưởng dọc đường. Sự kiện tự động kích hoạt vào mỗi cuối tuần (Thứ 6 đến Chủ Nhật). Chuỗi thắng bị reset về 0 mỗi đầu sự kiện. Từ lần đạt mốc cao nhất (Mốc 45) thứ 2 trở đi, phần thưởng Avatar sẽ được quy đổi thành Ruby Pack. *(Có thể xem chi tiết các phần thưởng ở tab Economy Tuning)*
+- **Master Pass (Battle Pass):** Hệ thống Battle Pass của game. Thu thập token từ các màn chơi (Thắng Normal: 1 Token, Hard: 2 Tokens, Super Hard: 3 Tokens) để thăng cấp (tối đa 30) và nhận thưởng. Nhánh Premium (trả phí) sẽ mở khóa nhiều phần thưởng hấp dẫn hơn. *(Có thể xem chi tiết các phần thưởng ở tab Economy Tuning)*
+- **Key Collection:** Cày chìa khóa theo tiến độ để mở khóa các phần thưởng theo mốc. Mỗi level qua màn nhận mặc định 5 keys bất kể độ khó. *(Có thể xem chi tiết các phần thưởng ở tab Economy Tuning)*
+- **Chain Offer & IAP:** Các sự kiện bán gói ưu đãi theo chuỗi. Simulator cho phép bạn giả lập "tiêu tiền" vào các mốc Chain (VD: Mua OOC, Mua Shop) để tính toán tổng lợi nhuận Pack thu về so với số USD đã bỏ ra. Mặc định mua các gói này nhận Pack thường (Không áp dụng thưởng sự kiện Card Rush).
+- **⚡ Card Rush:** Sự kiện đặc biệt mở theo lịch tuần (Tuần 1-2: Thứ 7 | Tuần 3-5: Thứ 4, 7 | Tuần 6-9: Thứ 2, 4, 7). Khi kích hoạt, các gói thẻ thường (Bronze, Emerald, Silver) sẽ chuyển thành **Plus (+), thêm 50% số lượng thẻ** vào từng gói (VD: Bronze từ 2 lên 3 thẻ, Emerald từ 3 lên 5 thẻ, Silver từ 4 lên 6 thẻ...). Mua gói từ Shop/IAP sẽ KHÔNG được cộng dồn Card Rush.
     """)

@@ -11,9 +11,16 @@ def is_card_rush_day(day: int) -> bool:
     elif 3 <= week <= 5: return weekday in (3, 6)
     else: return weekday in (1, 3, 6)
 
-def get_day_of_level(level: int, levels_per_day: int) -> int:
-    if levels_per_day <= 0: return 1
-    return math.ceil(level / levels_per_day)
+def get_day_of_level(level: int, levels_per_weekday: int, levels_per_weekend: int) -> int:
+    if levels_per_weekday <= 0 and levels_per_weekend <= 0: return 1
+    total = 0
+    day = 1
+    while True:
+        weekday = (day - 1) % 7 + 1
+        total += levels_per_weekend if weekday in (5, 6, 7) else levels_per_weekday
+        if level <= total:
+            return day
+        day += 1
 
 def get_day_string(day: int) -> str:
     week = (day - 1) // 7 + 1
@@ -41,8 +48,11 @@ def add_packs_from_string(reward_str: str, packs_dict: dict, is_cr: bool, day: i
             if is_cr and upgraded != base and cr_detailed_logs is not None:
                 cr_detailed_logs.append(f"Đã nâng cấp {total_to_add} gói {base} → {upgraded} (Từ {source} vào {get_day_string(day)})")
 
-def calculate_levels(days: int, levels_per_day: int) -> Dict[str, int]:
-    total_levels = days * levels_per_day
+def calculate_levels(days: int, levels_per_weekday: int, levels_per_weekend: int) -> Dict[str, int]:
+    total_levels = 0
+    for day in range(1, days + 1):
+        weekday = (day - 1) % 7 + 1
+        total_levels += levels_per_weekend if weekday in (5, 6, 7) else levels_per_weekday
     full_cycles = total_levels // 9
     remainder = total_levels % 9
     
@@ -63,7 +73,7 @@ def calculate_levels(days: int, levels_per_day: int) -> Dict[str, int]:
         "super_hard": super_hard
     }
 
-def simulate_core_gameplay(total_levels: int, levels_per_day: int, cr_enabled: bool, cr_detailed_logs: list, core_enabled: bool = True) -> Dict[str, Any]:
+def simulate_core_gameplay(days: int, levels_per_weekday: int, levels_per_weekend: int, cr_enabled: bool, cr_detailed_logs: list, core_enabled: bool = True) -> Dict[str, Any]:
     packs = {"Bronze": 0, "Bronze+": 0, "Emerald": 0, "Emerald+": 0}
     logs = []
     
@@ -72,22 +82,26 @@ def simulate_core_gameplay(total_levels: int, levels_per_day: int, cr_enabled: b
     bronze_plus = 0
     emerald_plus = 0
     
-    for level in range(1, total_levels + 1):
-        day = get_day_of_level(level, levels_per_day)
+    level = 0
+    for day in range(1, days + 1):
+        weekday = (day - 1) % 7 + 1
+        lpd = levels_per_weekend if weekday in (5, 6, 7) else levels_per_weekday
         is_cr = cr_enabled and is_card_rush_day(day)
         
-        if level % 3 == 0 and level % 9 != 0:
-            if is_cr and core_enabled: 
-                bronze_plus += 1
-                cr_detailed_logs.append(f"Đã nâng cấp 1 gói Bronze → Bronze+ (Từ Cày Cuốc [Màn Hard] vào {get_day_string(day)})")
-            elif core_enabled:
-                bronze_count += 1
-        elif level % 9 == 0:
-            if is_cr and core_enabled: 
-                emerald_plus += 1
-                cr_detailed_logs.append(f"Đã nâng cấp 1 gói Emerald → Emerald+ (Từ Cày Cuốc [Màn Super Hard] vào {get_day_string(day)})")
-            elif core_enabled:
-                emerald_count += 1
+        for _ in range(lpd):
+            level += 1
+            if level % 3 == 0 and level % 9 != 0:
+                if is_cr and core_enabled: 
+                    bronze_plus += 1
+                    cr_detailed_logs.append(f"Đã nâng cấp 1 gói Bronze → Bronze+ (Từ Cày Cuốc [Màn Hard] vào {get_day_string(day)})")
+                elif core_enabled:
+                    bronze_count += 1
+            elif level % 9 == 0:
+                if is_cr and core_enabled: 
+                    emerald_plus += 1
+                    cr_detailed_logs.append(f"Đã nâng cấp 1 gói Emerald → Emerald+ (Từ Cày Cuốc [Màn Super Hard] vào {get_day_string(day)})")
+                elif core_enabled:
+                    emerald_count += 1
             
     packs["Bronze"] = bronze_count
     packs["Bronze+"] = bronze_plus
@@ -102,23 +116,55 @@ def simulate_core_gameplay(total_levels: int, levels_per_day: int, cr_enabled: b
     
     return {"packs": packs, "logs": logs}
 
-def simulate_win_streak(total_wins: int, levels_per_day: int, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
+def simulate_win_streak(days: int, levels_per_weekday: int, levels_per_weekend: int, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
     packs = {"Bronze": 0, "Bronze+": 0, "Emerald": 0, "Emerald+": 0, "Silver": 0, "Silver+": 0, "Amethyst": 0, "Ruby": 0, "Gold": 0, "Rainbow": 0}
-    logs = [f"**Tổng kết Win Streak:** Đạt tối đa {total_wins} wins liên tiếp."]
+    logs = []
     
-    for req_wins, reward_str in config_rewards["win_streak_rewards"].items():
-        if total_wins >= req_wins:
-            day = get_day_of_level(req_wins, levels_per_day)
-            is_cr = cr_enabled and is_card_rush_day(day)
+    total_level = 0
+    event_count = 0
+    event_wins = 0
+    claimed_milestones = set()
+    has_avatar = False
+    
+    for day in range(1, days + 1):
+        weekday = (day - 1) % 7 + 1
+        is_cr = cr_enabled and is_card_rush_day(day)
+        
+        # Reset event every Friday
+        if weekday == 5:
+            event_count += 1
+            event_wins = 0
+            claimed_milestones = set()
             
-            if "Pack" in reward_str:
-                cr_tag = " (Card Rush)" if is_cr else ""
-                logs.append(f"Mốc {req_wins} Win (Cần {req_wins} wins){cr_tag}: {reward_str}")
-            add_packs_from_string(reward_str, packs, is_cr, day, f"Win Streak Mốc {req_wins}", cr_detailed_logs)
-            
+        lpd = levels_per_weekend if weekday in (5, 6, 7) else levels_per_weekday
+        for _ in range(lpd):
+            total_level += 1
+            # Event is active Friday, Saturday, Sunday
+            if weekday in (5, 6, 7):
+                event_wins += 1
+                
+                # Check milestones immediately upon winning a level
+                for req_wins, reward_str in config_rewards["win_streak_rewards"].items():
+                    if event_wins == req_wins and req_wins not in claimed_milestones:
+                        claimed_milestones.add(req_wins)
+                        
+                        reward_str_to_process = reward_str
+                        if "Avatar" in reward_str:
+                            if not has_avatar:
+                                has_avatar = True
+                                reward_str_to_process = reward_str.split("(Hoặc")[0].strip()
+                            else:
+                                reward_str_to_process = "500 Coins + 1x Boosters Set + **1x Ruby Pack**"
+                        
+                        if "Pack" in reward_str_to_process:
+                            cr_tag = " (Card Rush)" if is_cr else ""
+                            logs.append(f"Tuần {(day - 1) // 7 + 1} - Mốc {req_wins} Win{cr_tag}: {reward_str_to_process}")
+                            
+                        add_packs_from_string(reward_str_to_process, packs, is_cr, day, f"Win Streak Tuần {(day - 1) // 7 + 1} Mốc {req_wins}", cr_detailed_logs)
+                        
     return {"packs": packs, "logs": logs}
 
-def simulate_key_collection(total_levels: int, levels_per_day: int, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
+def simulate_key_collection(total_levels: int, levels_per_weekday: int, levels_per_weekend: int, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
     total_keys = total_levels * 5
     packs = {"Bronze": 0, "Bronze+": 0, "Emerald": 0, "Emerald+": 0, "Silver": 0, "Silver+": 0, "Amethyst": 0, "Ruby": 0, "Gold": 0, "Rainbow": 0}
     logs = [f"**Tổng số Keys kiếm được:** {total_keys} Keys (Mỗi level qua bàn nhận mặc định 5 keys)"]
@@ -127,7 +173,7 @@ def simulate_key_collection(total_levels: int, levels_per_day: int, cr_enabled: 
         if total_keys >= req_keys:
             reward_str = config_rewards["key_collection_rewards"].get(stage, "")
             level_earned = math.ceil(req_keys / 5)
-            day = get_day_of_level(level_earned, levels_per_day)
+            day = get_day_of_level(level_earned, levels_per_weekday, levels_per_weekend)
             is_cr = cr_enabled and is_card_rush_day(day)
             
             if "Pack" in reward_str:
@@ -143,13 +189,13 @@ def simulate_key_collection(total_levels: int, levels_per_day: int, cr_enabled: 
 def get_tokens_at_level(level: int) -> int:
     cycles = level // 9
     rem = level % 9
-    tokens = cycles * 14
+    tokens = cycles * 13
     pattern = [1, 1, 2, 1, 1, 2, 1, 1, 3]
     for i in range(rem):
         tokens += pattern[i]
     return tokens
 
-def simulate_master_pass(total_levels: int, levels_per_day: int, is_premium: bool, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
+def simulate_master_pass(total_levels: int, levels_per_weekday: int, levels_per_weekend: int, is_premium: bool, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
     total_tokens = get_tokens_at_level(total_levels)
     stage_tokens = [0, 1, 3, 6, 10, 18, 23, 29, 38, 45, 55, 63, 75, 86, 95, 110, 126, 136, 150, 168, 188, 203, 214, 233, 250, 270, 288, 309, 333, 355, 380]
     
@@ -172,7 +218,7 @@ def simulate_master_pass(total_levels: int, levels_per_day: int, is_premium: boo
                 level_earned = l
                 break
         
-        day = get_day_of_level(level_earned, levels_per_day)
+        day = get_day_of_level(level_earned, levels_per_weekday, levels_per_weekend)
         is_cr = cr_enabled and is_card_rush_day(day)
         
         free_r = config_rewards["master_pass_free"].get(s, "")
@@ -194,8 +240,8 @@ def simulate_master_pass(total_levels: int, levels_per_day: int, is_premium: boo
             
     return {"packs": packs, "logs": logs}
 
-def simulate_liveops(days: int, levels_per_day: int, toggles: Dict[str, bool], iap: Dict[str, Any], config_rewards: Dict[str, Any]) -> Dict[str, Any]:
-    levels_info = calculate_levels(days, levels_per_day)
+def simulate_liveops(days: int, levels_per_weekday: int, levels_per_weekend: int, toggles: Dict[str, bool], iap: Dict[str, Any], config_rewards: Dict[str, Any]) -> Dict[str, Any]:
+    levels_info = calculate_levels(days, levels_per_weekday, levels_per_weekend)
     total_levels = levels_info["total"]
     cr_enabled = toggles.get("card_rush", False)
     core_enabled = toggles.get("core_gameplay", True)
@@ -204,22 +250,22 @@ def simulate_liveops(days: int, levels_per_day: int, toggles: Dict[str, bool], i
     all_logs = {}
     cr_detailed_logs = []
     
-    core = simulate_core_gameplay(total_levels, levels_per_day, cr_enabled, cr_detailed_logs, core_enabled)
+    core = simulate_core_gameplay(days, levels_per_weekday, levels_per_weekend, cr_enabled, cr_detailed_logs, core_enabled)
     for p, v in core["packs"].items(): result_packs[p] += v
     all_logs["core"] = core["logs"]
     
     if toggles.get("win_streak"):
-        ws = simulate_win_streak(total_levels, levels_per_day, cr_enabled, cr_detailed_logs, config_rewards)
+        ws = simulate_win_streak(days, levels_per_weekday, levels_per_weekend, cr_enabled, cr_detailed_logs, config_rewards)
         for p, v in ws["packs"].items(): result_packs[p] += v
         all_logs["win_streak"] = ws["logs"]
         
     if toggles.get("key_collection"):
-        kc = simulate_key_collection(total_levels, levels_per_day, cr_enabled, cr_detailed_logs, config_rewards)
+        kc = simulate_key_collection(total_levels, levels_per_weekday, levels_per_weekend, cr_enabled, cr_detailed_logs, config_rewards)
         for p, v in kc["packs"].items(): result_packs[p] += v
         all_logs["key_collection"] = kc["logs"]
         
     if toggles.get("master_pass"):
-        mp = simulate_master_pass(total_levels, levels_per_day, toggles.get("master_pass_premium", False), cr_enabled, cr_detailed_logs, config_rewards)
+        mp = simulate_master_pass(total_levels, levels_per_weekday, levels_per_weekend, toggles.get("master_pass_premium", False), cr_enabled, cr_detailed_logs, config_rewards)
         for p, v in mp["packs"].items(): result_packs[p] += v
         all_logs["master_pass"] = mp["logs"]        
     iap_summary = {p: 0 for p in PACK_ORDER}
@@ -302,8 +348,8 @@ def simulate_liveops(days: int, levels_per_day: int, toggles: Dict[str, bool], i
     
     assumptions = [
         "Tỉ lệ thắng (Win-rate) là 100%.",
-        "Tiến trình Level: N-N-H, N-N-H, N-N-SH (Chuỗi này nối tiếp liên tục qua các ngày).",
-        "Phần thưởng Win Streak chỉ được nhận 1 lần duy nhất trong toàn bộ mùa.",
+        "Tiến trình Level: N-N-H, N-N-H, N-N-SH (sau 2 Normal - 1 Hard, sau 2 Hard - 1 Super Hard)).",
+        "Mặc định người chơi đã mở khóa tất cả LiveOps.",
         "Người chơi bắt đầu chu kỳ 60 ngày kể từ Thứ Hai đầu tuần và chơi đều đặn mỗi ngày (không cách ngày).",
         "Toàn bộ các gói Pack mua từ IAP/Cửa hàng đều mặc định là gói Thường (Không áp dụng thưởng sự kiện Card Rush)."
     ]
