@@ -1,4 +1,5 @@
 *.md
 __pycache__/
 *.xlsx
-*.txt
+*.csv
+out.txt
