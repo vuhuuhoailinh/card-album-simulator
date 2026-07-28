@@ -164,80 +164,96 @@ def simulate_win_streak(days: int, levels_per_weekday: int, levels_per_weekend: 
                         
     return {"packs": packs, "logs": logs}
 
-def simulate_key_collection(total_levels: int, levels_per_weekday: int, levels_per_weekend: int, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
-    total_keys = total_levels * 5
+def simulate_key_collection(days: int, levels_per_weekday: int, levels_per_weekend: int, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
     packs = {"Bronze": 0, "Bronze+": 0, "Emerald": 0, "Emerald+": 0, "Silver": 0, "Silver+": 0, "Amethyst": 0, "Ruby": 0, "Gold": 0, "Rainbow": 0}
-    logs = [f"**Tổng số Keys kiếm được:** {total_keys} Keys (Mỗi level qua bàn nhận mặc định 5 keys)"]
+    logs = [f"**Lưu ý:** Sự kiện Key Collection diễn ra và reset hàng tuần vào mỗi Thứ 2."]
     
-    for stage, req_keys in {1:3, 2:8, 3:15, 4:25, 5:33, 6:40, 7:52, 8:67, 9:77, 10:89, 11:99, 12:111, 13:126, 14:138, 15:154, 16:164, 17:176, 18:192, 19:204, 20:214, 21:229, 22:241, 23:259, 24:279, 25:304}.items():
-        if total_keys >= req_keys:
-            reward_str = config_rewards["key_collection_rewards"].get(stage, "")
-            level_earned = math.ceil(req_keys / 5)
-            day = get_day_of_level(level_earned, levels_per_weekday, levels_per_weekend)
-            is_cr = cr_enabled and is_card_rush_day(day)
+    stage_reqs = {1:3, 2:8, 3:15, 4:25, 5:33, 6:40, 7:52, 8:67, 9:77, 10:89, 11:99, 12:111, 13:126, 14:138, 15:154, 16:164, 17:176, 18:192, 19:204, 20:214, 21:229, 22:241, 23:259, 24:279, 25:304}
+    total_keys_ever = 0
+    event_keys = 0
+    claimed_milestones = set()
+    
+    for day in range(1, days + 1):
+        weekday = (day - 1) % 7 + 1
+        is_cr = cr_enabled and is_card_rush_day(day)
+        
+        # Reset event every Monday
+        if weekday == 1:
+            event_keys = 0
+            claimed_milestones = set()
             
-            if "Pack" in reward_str:
-                cr_tag = " (Card Rush)" if is_cr else ""
-                logs.append(f"Stage {stage} (Cần {req_keys} keys){cr_tag}: {reward_str}")
-            add_packs_from_string(reward_str, packs, is_cr, day, f"Key Collection Stage {stage}", cr_detailed_logs)
-        else:
-            logs.append(f"❌ Dừng lại ở Stage {stage} (Cần {req_keys} keys, bạn có {total_keys})")
-            break
+        lpd = levels_per_weekend if weekday in (5, 6, 7) else levels_per_weekday
+        for _ in range(lpd):
+            event_keys += 5
+            total_keys_ever += 5
             
+            for stage, req_keys in stage_reqs.items():
+                if event_keys >= req_keys and stage not in claimed_milestones:
+                    claimed_milestones.add(stage)
+                    reward_str = config_rewards["key_collection_rewards"].get(stage, "")
+                    
+                    if "Pack" in reward_str:
+                        cr_tag = " (Card Rush)" if is_cr else ""
+                        logs.append(f"Tuần {(day - 1) // 7 + 1} - Stage {stage} ({req_keys} keys){cr_tag}: {reward_str}")
+                    add_packs_from_string(reward_str, packs, is_cr, day, f"Key Collection Tuần {(day - 1) // 7 + 1} Stage {stage}", cr_detailed_logs)
+
+    logs.insert(1, f"**Tổng số Keys kiếm được (cả mùa):** {total_keys_ever} Keys (Mỗi level qua bàn nhận mặc định 5 keys)")
     return {"packs": packs, "logs": logs}
 
-def get_tokens_at_level(level: int) -> int:
-    cycles = level // 9
-    rem = level % 9
-    tokens = cycles * 13
-    pattern = [1, 1, 2, 1, 1, 2, 1, 1, 3]
-    for i in range(rem):
-        tokens += pattern[i]
-    return tokens
+def get_tokens_for_level(level: int) -> int:
+    if level % 9 == 0: return 3
+    if level % 3 == 0: return 2
+    return 1
 
-def simulate_master_pass(total_levels: int, levels_per_weekday: int, levels_per_weekend: int, is_premium: bool, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
-    total_tokens = get_tokens_at_level(total_levels)
+def simulate_master_pass(days: int, levels_per_weekday: int, levels_per_weekend: int, is_premium: bool, cr_enabled: bool, cr_detailed_logs: list, config_rewards: dict) -> Dict[str, Any]:
     stage_tokens = [0, 1, 3, 6, 10, 18, 23, 29, 38, 45, 55, 63, 75, 86, 95, 110, 126, 136, 150, 168, 188, 203, 214, 233, 250, 270, 288, 309, 333, 355, 380]
     
     packs = {"Bronze": 0, "Bronze+": 0, "Emerald": 0, "Emerald+": 0, "Silver": 0, "Silver+": 0, "Amethyst": 0, "Ruby": 0, "Gold": 0, "Rainbow": 0}
-    logs = [f"**Tổng số Token kiếm được:** {total_tokens} Tokens (Thắng màn Normal = 1 Token, Hard = 2 Tokens, Super Hard = 3 Tokens)"]
+    logs = [f"**Lưu ý:** Sự kiện Master Pass diễn ra và reset hàng tháng (mỗi 30 ngày)."]
     
-    current_stage = -1
-    for i, req in enumerate(stage_tokens):
-        if total_tokens >= req:
-            current_stage = i
-        else:
-            logs.append(f"❌ Dừng lại ở Stage {i} (Cần {req} tokens, bạn có {total_tokens})")
-            break
-            
-    for s in range(0, current_stage + 1):
-        req_tokens = stage_tokens[s]
-        level_earned = 1
-        for l in range(1, total_levels + 2):
-            if get_tokens_at_level(l) >= req_tokens:
-                level_earned = l
-                break
-        
-        day = get_day_of_level(level_earned, levels_per_weekday, levels_per_weekend)
+    total_tokens_ever = 0
+    event_tokens = 0
+    claimed_milestones = set()
+    global_level = 0
+    
+    for day in range(1, days + 1):
+        weekday = (day - 1) % 7 + 1
         is_cr = cr_enabled and is_card_rush_day(day)
         
-        free_r = config_rewards["master_pass_free"].get(s, "")
-        prem_r = config_rewards["master_pass_premium"].get(s, "")
-        
-        has_pack_free = "Pack" in free_r
-        has_pack_prem = is_premium and "Pack" in prem_r
-        
-        if has_pack_free or has_pack_prem:
-            cr_tag = " (Card Rush)" if is_cr else ""
-            log_line = f"Stage {s} (Cần {req_tokens} tokens){cr_tag}: "
-            if has_pack_free: log_line += f"[Free] {free_r} "
-            if has_pack_prem: log_line += f"| [Premium] {prem_r}"
-            logs.append(log_line)
-        
-        add_packs_from_string(free_r, packs, is_cr, day, f"Master Pass Stage {s} [Free]", cr_detailed_logs)
-        if is_premium:
-            add_packs_from_string(prem_r, packs, is_cr, day, f"Master Pass Stage {s} [Premium]", cr_detailed_logs)
+        # Reset event every 30 days (Monthly Battle Pass)
+        if day % 30 == 1:
+            event_tokens = 0
+            claimed_milestones = set()
             
+        lpd = levels_per_weekend if weekday in (5, 6, 7) else levels_per_weekday
+        for _ in range(lpd):
+            global_level += 1
+            tokens_earned = get_tokens_for_level(global_level)
+            event_tokens += tokens_earned
+            total_tokens_ever += tokens_earned
+            
+            for stage, req_tokens in enumerate(stage_tokens):
+                if event_tokens >= req_tokens and stage not in claimed_milestones:
+                    claimed_milestones.add(stage)
+                    
+                    free_r = config_rewards["master_pass_free"].get(stage, "")
+                    prem_r = config_rewards["master_pass_premium"].get(stage, "")
+                    
+                    has_pack_free = "Pack" in free_r
+                    has_pack_prem = is_premium and "Pack" in prem_r
+                    
+                    if has_pack_free or has_pack_prem:
+                        cr_tag = " (Card Rush)" if is_cr else ""
+                        log_line = f"Tháng {(day - 1) // 30 + 1} - Stage {stage} ({req_tokens} tokens){cr_tag}: "
+                        if has_pack_free: log_line += f"[Free] {free_r} "
+                        if has_pack_prem: log_line += f"| [Premium] {prem_r}"
+                        logs.append(log_line)
+                    
+                    add_packs_from_string(free_r, packs, is_cr, day, f"Master Pass Tháng {(day - 1) // 30 + 1} Stage {stage} [Free]", cr_detailed_logs)
+                    if is_premium:
+                        add_packs_from_string(prem_r, packs, is_cr, day, f"Master Pass Tháng {(day - 1) // 30 + 1} Stage {stage} [Premium]", cr_detailed_logs)
+
+    logs.insert(1, f"**Tổng số Token kiếm được (cả mùa):** {total_tokens_ever} Tokens (Thắng màn Normal = 1 Token, Hard = 2 Tokens, Super Hard = 3 Tokens)")
     return {"packs": packs, "logs": logs}
 
 def simulate_liveops(days: int, levels_per_weekday: int, levels_per_weekend: int, toggles: Dict[str, bool], iap: Dict[str, Any], config_rewards: Dict[str, Any]) -> Dict[str, Any]:
@@ -260,12 +276,12 @@ def simulate_liveops(days: int, levels_per_weekday: int, levels_per_weekend: int
         all_logs["win_streak"] = ws["logs"]
         
     if toggles.get("key_collection"):
-        kc = simulate_key_collection(total_levels, levels_per_weekday, levels_per_weekend, cr_enabled, cr_detailed_logs, config_rewards)
+        kc = simulate_key_collection(days, levels_per_weekday, levels_per_weekend, cr_enabled, cr_detailed_logs, config_rewards)
         for p, v in kc["packs"].items(): result_packs[p] += v
         all_logs["key_collection"] = kc["logs"]
         
     if toggles.get("master_pass"):
-        mp = simulate_master_pass(total_levels, levels_per_weekday, levels_per_weekend, toggles.get("master_pass_premium", False), cr_enabled, cr_detailed_logs, config_rewards)
+        mp = simulate_master_pass(days, levels_per_weekday, levels_per_weekend, toggles.get("master_pass_premium", False), cr_enabled, cr_detailed_logs, config_rewards)
         for p, v in mp["packs"].items(): result_packs[p] += v
         all_logs["master_pass"] = mp["logs"]        
     iap_summary = {p: 0 for p in PACK_ORDER}
@@ -349,7 +365,7 @@ def simulate_liveops(days: int, levels_per_weekday: int, levels_per_weekend: int
     assumptions = [
         "Tỉ lệ thắng (Win-rate) là 100%.",
         "Tiến trình Level: N-N-H, N-N-H, N-N-SH (sau 2 Normal - 1 Hard, sau 2 Hard - 1 Super Hard)).",
-        "Mặc định người chơi đã mở khóa tất cả LiveOps.",
+        "Mặc định người chơi đã mở khóa tất cả LiveOps. Key Collection reset mỗi đầu tuần (Thứ 2). Master Pass reset mỗi tháng (30 ngày).",
         "Người chơi bắt đầu chu kỳ 60 ngày kể từ Thứ Hai đầu tuần và chơi đều đặn mỗi ngày (không cách ngày).",
         "Toàn bộ các gói Pack mua từ IAP/Cửa hàng đều mặc định là gói Thường (Không áp dụng thưởng sự kiện Card Rush)."
     ]

@@ -133,7 +133,7 @@ def render_monte_carlo_results(res, iterations, total_cart_packs):
 
     st.subheader("Phân bổ Số lượng Thẻ thu thập được")
     chart_cards = alt.Chart(cards_summary).mark_bar(opacity=0.8, color="#4CAF50").encode(
-        alt.X("cards_group:O", title="Số Thẻ Cuối Cùng", axis=alt.Axis(labelAngle=-45)),
+        alt.X("cards_group:O", title="Số Thẻ Cuối Cùng", axis=alt.Axis(labelAngle=-45), sort=cards_summary["cards_group"].tolist()),
         alt.Y('count:Q', title="Số Lần Lặp (Tần suất)"),
         tooltip=[alt.Tooltip('cards_group:O', title='Số Thẻ'), alt.Tooltip('count:Q', title='Số Lần Lặp')]
     )
@@ -141,7 +141,7 @@ def render_monte_carlo_results(res, iterations, total_cart_packs):
     
     st.subheader("Phân bổ Số Sao dư thừa")
     chart_stars = alt.Chart(stars_summary).mark_bar(opacity=0.8, color="#FFC107").encode(
-        alt.X("stars_group:O", title="Tổng số Sao", axis=alt.Axis(labelAngle=-45)),
+        alt.X("stars_group:O", title="Tổng số Sao", axis=alt.Axis(labelAngle=-45), sort=stars_summary["stars_group"].tolist()),
         alt.Y('count:Q', title="Số Lần Lặp (Tần suất)"),
         tooltip=[alt.Tooltip('stars_group:O', title='Tổng số Sao'), alt.Tooltip('count:Q', title='Số Lần Lặp')]
     )
