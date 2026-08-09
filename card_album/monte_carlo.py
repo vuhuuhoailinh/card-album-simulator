@@ -16,7 +16,7 @@ def render_monte_carlo_tab():
     total_cart_packs = sum(cart.values())
     
     if total_cart_packs == 0:
-        st.warning("Giỏ hàng của bạn đang trống! Hãy sang tab **LiveOps Economy** để tính toán và lưu Packs vào giỏ, hoặc tự điền ở Sidebar bên trái.")
+        st.warning("Giỏ hàng của bạn đang trống! Hãy sang tab **LiveOps Economy** để cày sự kiện và lưu thẻ vào giỏ, hoặc qua tab **Mở Gói (Gacha)** để tự nhập số lượng thủ công vào Giỏ Hàng.")
         return
         
     st.info(f"🛒 **Giỏ Hàng hiện tại:** {', '.join([f'{v} {k}' for k, v in cart.items() if v > 0])}")
@@ -25,11 +25,12 @@ def render_monte_carlo_tab():
     with col1:
         iterations = st.number_input("Số lần chạy mô phỏng (Iterations)", min_value=10, max_value=5000, value=100, step=10)
         simulate_from_scratch = st.checkbox("🔄 Bắt đầu từ Kho Thẻ Trống", value=True, help="Nếu bật, mỗi lần chạy sẽ bắt đầu với 0 thẻ và 0 sao (Mô phỏng từ đầu game). Nếu tắt, sẽ bốc tiếp trên số thẻ bạn đang có hiện tại.")
+        auto_chest = st.checkbox("🔄 Tự động dùng sao dư để đổi Star Chest", value=True, help="Hệ thống sẽ tự động mua rương xịn nhất có thể (Vàng -> Bạc -> Đồng) cho đến khi không đủ sao (dưới 100 sao).")
         start_btn = st.button("🚀 BẮT ĐẦU MÔ PHỎNG", type="primary", use_container_width=True)
         
     if start_btn:
         with st.spinner(f"Đang giả lập {iterations} lần bóc {total_cart_packs} pack..."):
-            results = run_monte_carlo(st.session_state, cart, iterations, simulate_from_scratch)
+            results = run_monte_carlo(st.session_state, cart, iterations, simulate_from_scratch, auto_chest)
             st.session_state["mc_results"] = results
             
     if "mc_results" in st.session_state:
@@ -37,7 +38,7 @@ def render_monte_carlo_tab():
         render_monte_carlo_results(res, iterations, total_cart_packs)
 
 
-def run_monte_carlo(base_state, cart, iterations, simulate_from_scratch=True):
+def run_monte_carlo(base_state, cart, iterations, simulate_from_scratch=True, auto_chest=False):
     cards_collected = []
     stars_collected = []
     grand_album_count = []
@@ -58,11 +59,17 @@ def run_monte_carlo(base_state, cart, iterations, simulate_from_scratch=True):
             "new_card_formula_type": base_state["new_card_formula_type"],
             "config_packs": base_state["config_packs"],
             "new_card_power": base_state.get("new_card_power", 1.0),
-            "pity_multiplier": base_state.get("pity_multiplier", 1.0)
+            "pity_multiplier": base_state.get("pity_multiplier", 1.0),
+            "owned_cards": set() if simulate_from_scratch else copy.deepcopy(base_state.get("owned_cards", set())),
+            "total_cards_drawn": 0 if simulate_from_scratch else base_state.get("total_cards_drawn", 0),
+            "new_cards_drawn": 0 if simulate_from_scratch else base_state.get("new_cards_drawn", 0),
+            "dup_cards_drawn": 0 if simulate_from_scratch else base_state.get("dup_cards_drawn", 0),
+            "new_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("new_cards_by_rarity", {r: 0 for r in range(1, 7)})),
+            "dup_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("dup_cards_by_rarity", {r: 0 for r in range(1, 7)})),
         }
         
         # Run the bulk open
-        open_bulk_packs(sim_state, cart)
+        open_bulk_packs(sim_state, cart, auto_chest=auto_chest)
         
         # Record results
         total_cards = sim_state["grand_album_completions"] * TOTAL_CARDS + sum(sim_state["inventory"].values())

@@ -41,6 +41,32 @@ PACKS = {
     "Rainbow": PackConfig("Rainbow", 6, 6, {1: 18, 2: 18, 3: 19, 4: 20, 5: 15, 6: 10}, -1.0, 0, 0.0),
 }
 
+# The actual distribution of 135 cards into 15 sets, based on their rarities.
+# Key: Set ID (1-15), Value: Dict of {rarity: count}
+CARD_SETS = {
+    1: {"name": "Items", "cards": {1: 8, 2: 1}},
+    2: {"name": "Transport", "cards": {1: 7, 2: 2}},
+    3: {"name": "Souvenirs", "cards": {1: 7, 2: 1, 3: 1}},
+    4: {"name": "Cuisine", "cards": {1: 5, 2: 3, 3: 1}},
+    5: {"name": "Camping", "cards": {1: 3, 2: 4, 3: 1, 4: 1}},
+    6: {"name": "Beach", "cards": {1: 2, 2: 4, 3: 1, 4: 1, 5: 1}},
+    7: {"name": "Retreat", "cards": {1: 1, 2: 3, 3: 2, 4: 1, 5: 1, 6: 1}},
+    8: {"name": "Theme Park", "cards": {2: 4, 3: 2, 4: 1, 5: 1, 6: 1}},
+    9: {"name": "Nature", "cards": {2: 3, 3: 2, 4: 1, 5: 2, 6: 1}},
+    10: {"name": "Ice Nature", "cards": {2: 2, 3: 2, 4: 2, 5: 1, 6: 2}},
+    11: {"name": "Museum", "cards": {2: 1, 3: 3, 4: 1, 5: 2, 6: 2}},
+    12: {"name": "Culture", "cards": {3: 3, 4: 2, 5: 2, 6: 2}},
+    13: {"name": "Landmark", "cards": {3: 3, 4: 2, 5: 1, 6: 3}},
+    14: {"name": "Festivals", "cards": {3: 2, 4: 2, 5: 2, 6: 3}},
+    15: {"name": "Wonders", "cards": {4: 4, 5: 2, 6: 3}},
+}
+
+CHEST_CONFIG = {
+    "Bronze": {"cost": 100, "packs": ["Silver"]},
+    "Silver": {"cost": 250, "packs": ["Amethyst", "Silver"]},
+    "Gold": {"cost": 500, "packs": ["Rainbow", "Amethyst", "Silver"]}
+}
+
 PACK_ORDER = ["Bronze", "Bronze+", "Emerald", "Emerald+", "Silver", "Silver+", "Amethyst", "Ruby", "Gold", "Rainbow"]
 PACK_ICONS = {
     "Bronze": "🟫",

@@ -10,7 +10,7 @@ from .config import (
     RARITIES,
     TOTAL_CARDS,
 )
-from .gacha import build_rate_rows, get_pity_bonus, open_bulk_packs, open_pack, rarity_label
+from .gacha import build_rate_rows, get_pity_bonus, open_bulk_packs, open_pack, open_chest, rarity_label
 from .state import ensure_album_state, reset_progress, total_cards_collected
 from .liveops_simulator import simulate_liveops
 
@@ -18,8 +18,6 @@ from .liveops_simulator import simulate_liveops
 def run_app() -> None:
     st.set_page_config(page_title="Card Album Simulator", layout="wide")
     ensure_album_state(st.session_state)
-
-    selected_pack = render_sidebar()
     
     col_title, col_btn = st.columns([0.95, 0.05], vertical_alignment="bottom")
     with col_title:
@@ -57,12 +55,13 @@ def run_app() -> None:
         if st.button("i", type="primary", help="Infomation"):
             show_logic_dialog()
     
-    tab_manual, tab_mc, tab_auto, tab_config = st.tabs(["🎮 Mở Pack", "📊 Monte Carlo Simulator", "📈 LiveOps Economy", "⚙️ Economy Tuning"])
+    tab_inventory, tab_manual, tab_auto, tab_mc, tab_config = st.tabs(["📚 Bộ Sưu Tập", "📦 Mở Gói (Gacha)", "📈 LiveOps Economy", "📊 Monte Carlo Simulator", "⚙️ Economy Tuning"])
     
+    with tab_inventory:
+        render_inventory_tab()
+        
     with tab_manual:
-        render_album_dashboard()
-        st.divider()
-        render_main_content(selected_pack)
+        render_pack_opener_tab()
         
     with tab_mc:
         from .monte_carlo import render_monte_carlo_tab
@@ -76,49 +75,6 @@ def run_app() -> None:
         render_config_tab()
 
 
-def render_sidebar() -> str:
-    with st.sidebar:
-        inject_sidebar_toggle_style()
-        st.title("🎮GACHA MENU")
-
-        render_grand_album_section()
-        st.divider()
-        st.subheader("🛒 Mở Từng Pack")
-        selected_pack = st.selectbox("Chọn Pack:", PACK_ORDER, key="single_pack_select")
-
-        if st.button(f"MỞ 1 GÓI {selected_pack.upper()}", type="primary", use_container_width=True):
-            open_pack(st.session_state, selected_pack)
-            st.rerun()
-
-        st.subheader("🛒 Giỏ Hàng (Cart)")
-        with st.expander("📦 Xem / Chỉnh sửa Giỏ Hàng", expanded=False):
-            for pack in PACK_ORDER:
-                if f"cart_input_{pack}" not in st.session_state:
-                    st.session_state[f"cart_input_{pack}"] = st.session_state["cart_packs"].get(pack, 0)
-                
-                st.number_input(
-                    f"{PACK_ICONS[pack]} {pack}",
-                    min_value=0,
-                    max_value=10000,
-                    step=1,
-                    key=f"cart_input_{pack}",
-                )
-                st.session_state["cart_packs"][pack] = st.session_state[f"cart_input_{pack}"]
-
-            def execute_cart():
-                success, message = open_bulk_packs(st.session_state, st.session_state["cart_packs"])
-                if not success:
-                    st.toast(message, icon="⚠️")
-            st.button("MỞ TOÀN BỘ GIỎ HÀNG", type="primary", use_container_width=True, on_click=execute_cart)
-
-        st.markdown("___________________")
-        if st.button("🗑️ Reset Dữ Liệu Mở Pack", use_container_width=True):
-            reset_progress(st.session_state)
-            st.rerun()
-
-    return selected_pack
-
-
 def render_grand_album_section() -> None:
     st.toggle(
         "🏆 Grand Album",
@@ -127,51 +83,6 @@ def render_grand_album_section() -> None:
     )
     if st.session_state.get("grand_album_enabled", True):
         st.caption("Grand Album: Khi đạt mốc 135 thẻ, kho thẻ tự reset về 0 (giữ nguyên Sao). Các thẻ tiếp theo rút được sẽ tính cho vòng Album mới.")
-
-
-def inject_sidebar_toggle_style() -> None:
-    st.markdown(
-        """
-        <style>
-        section[data-testid="stSidebar"] div[data-testid="stToggle"],
-        section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {
-            margin: 0.2rem 0 0.35rem;
-        }
-        section[data-testid="stSidebar"] div[data-testid="stToggle"] label,
-        section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            align-items: center;
-            gap: 0.8rem;
-            min-height: 3.1rem;
-            width: 100%;
-        }
-        section[data-testid="stSidebar"] div[data-testid="stToggle"] label p,
-        section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
-            font-size: 1.15rem;
-            font-weight: 600;
-            line-height: 1.2;
-            text-transform: none;
-            white-space: nowrap;
-        }
-        section[data-testid="stSidebar"] div[data-testid="stToggle"] [role="switch"],
-        section[data-testid="stSidebar"] div[data-testid="stCheckbox"] [role="switch"] {
-            min-width: 3.25rem !important;
-            width: 3.25rem !important;
-            min-height: 1.8rem !important;
-            height: 1.8rem !important;
-            transform: scale(1.28);
-            transform-origin: left center;
-        }
-        section[data-testid="stSidebar"] div[data-testid="stToggle"] [role="switch"] *,
-        section[data-testid="stSidebar"] div[data-testid="stCheckbox"] [role="switch"] * {
-            transition: all 120ms ease;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 def render_pity_panel(selected_pack: str) -> None:
@@ -199,50 +110,231 @@ def render_pity_panel(selected_pack: str) -> None:
         st.caption(f"*Cơ chế (Tạch liên tiếp): {', '.join(pity_rules)}*")
 
 
-def render_album_dashboard() -> None:
-    col_left, col_right = st.columns([1.2, 5])
-    with col_left:
-        total_cards = total_cards_collected(st.session_state)
-        completions = st.session_state.get("grand_album_completions", 0)
-        is_finished = st.session_state.get("grand_album_finished", False)
-        
-        if is_finished:
-            st.metric("🎯 Tiến độ Album", f"{total_cards} / {TOTAL_CARDS}", delta="🏆 Đã hoàn thành Grand Album")
-        elif completions > 0:
-            st.metric("🎯 Tiến độ Album", f"{total_cards} / {TOTAL_CARDS}", delta="🏆 Đang ở vòng Grand Album")
-        else:
-            st.metric("🎯 Tiến độ Album", f"{total_cards} / {TOTAL_CARDS}")
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.metric("⭐ Sao Tích Luỹ", f"{st.session_state['stars']}")
-        st.caption(f"Tổng đã mở: **{st.session_state['total_packs']}** gói")
+def format_card_name_ui(card):
+    if not card: return "Unknown"
+    from .config import CARD_SETS
+    set_id, rarity, idx = card
+    return f"{CARD_SETS[set_id]['name']} #{idx+1}"
 
-    with col_right:
-        card_cols = st.columns(len(RARITIES))
-        for rarity, col in zip(RARITIES, card_cols):
-            current = st.session_state["inventory"][rarity]
-            maximum = MAX_CARDS[rarity]
-            progress = current / maximum if maximum > 0 else 0
-            with col:
-                st.markdown(f"**{rarity_label(rarity)}**")
-                st.progress(progress)
-                st.caption(f"{current} / {maximum} thẻ")
+def render_inventory_tab() -> None:
+    col_ga, col_reset = st.columns([4, 1])
+    with col_ga:
+        render_grand_album_section()
+    with col_reset:
+        if st.button("🗑️ Reset Dữ Liệu", use_container_width=True, type="primary"):
+            reset_progress(st.session_state)
+            st.rerun()
+    st.divider()
+    
+    total_cards = total_cards_collected(st.session_state)
+    completions = st.session_state.get("grand_album_completions", 0)
+    is_finished = st.session_state.get("grand_album_finished", False)
+    
+    st.subheader("Tiến độ Album")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("🎴 Thẻ thu thập được", f"{total_cards} / {TOTAL_CARDS}")
+        if completions > 0 or is_finished:
+            st.markdown("<div style='margin-top:-15px; color:#FFD700; font-weight:bold;'>🏆 Grand Album</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='margin-top:-15px; color:#888; font-weight:bold;'>Thường</div>", unsafe_allow_html=True)
+            
+    col2.metric("⭐ Sao dư thừa", f"{st.session_state['stars']}")
+    col3.metric("📈 Thẻ Mới / Thẻ Trùng", f"{st.session_state.get('new_cards_drawn', 0)} / {st.session_state.get('dup_cards_drawn', 0)}")
+    
+    st.divider()
+    st.subheader("Tiến độ theo Độ Hiếm")
+    from .config import MAX_CARDS
+    
+    rarity_colors = {
+        1: "gray", 2: "#32CD32", 3: "#1E90FF",
+        4: "#9370DB", 5: "#FFA500", 6: "#FF1493"
+    }
+
+    rarity_cols = st.columns(6)
+    for r in range(1, 7):
+        with rarity_cols[r-1]:
+            if r < 6:
+                icon_str = "⭐" * r
+            else:
+                icon_str = "<span style='font-size: 1.2em;'>🌟</span>"
+            r_owned = st.session_state["inventory"][r]
+            r_max = MAX_CARDS[r]
+            color = rarity_colors[r]
+            pct = int((r_owned / r_max) * 100) if r_max > 0 else 0
+            
+            html = f"""
+            <div style='margin-bottom: 10px;'>
+                <div style='font-weight: bold; color: {color}; margin-bottom: 8px;'>{icon_str}</div>
+                <div style='width: 100%; background-color: rgba(128,128,128,0.2); border-radius: 5px; height: 10px; margin-bottom: 8px;'>
+                    <div style='width: {pct}%; background-color: {color}; height: 100%; border-radius: 5px;'></div>
+                </div>
+                <div style='font-size: 0.85em; color: gray;'>{r_owned} / {r_max} thẻ</div>
+            </div>
+            """
+            st.markdown(html, unsafe_allow_html=True)
+    
+    st.divider()
+    st.subheader("Chi tiết 15 Set Thẻ")
+    from .config import CARD_SETS
+    cols = st.columns(3)
+    
+    set_colors_rgb = [
+        "255, 99, 132", "54, 162, 235", "255, 206, 86", 
+        "75, 192, 192", "153, 102, 255", "255, 159, 64", 
+        "233, 30, 99", "0, 150, 136", "139, 195, 74", 
+        "205, 220, 57", "121, 85, 72", "96, 125, 139", 
+        "244, 67, 54", "33, 150, 243", "156, 39, 176"
+    ]
+    
+    for idx, (set_id, set_info) in enumerate(CARD_SETS.items()):
+        with cols[idx % 3]:
+            total_in_set = sum(set_info["cards"].values())
+            owned_in_set = [c for c in st.session_state["owned_cards"] if c[0] == set_id]
+            owned_count = len(owned_in_set)
+            
+            rgb = set_colors_rgb[idx % len(set_colors_rgb)]
+            pct = int((owned_count / total_in_set) * 100) if total_in_set > 0 else 0
+            
+            breakdown_html = ""
+            for r in sorted(set_info["cards"].keys()):
+                r_total = set_info["cards"][r]
+                r_owned = len([c for c in owned_in_set if c[1] == r])
+                icon = "⭐" * r if r < 6 else "🌟"
+                if r_owned == r_total:
+                    breakdown_html += f"<div style='font-size:0.85em; margin-top:2px;'>✅ {icon} {r_owned}/{r_total}</div>"
+                else:
+                    breakdown_html += f"<div style='font-size:0.85em; margin-top:2px; opacity:0.7;'>⬛ {icon} {r_owned}/{r_total}</div>"
+            
+            is_completed = (total_in_set > 0 and owned_count == total_in_set)
+            border_style = f"2px solid rgb({rgb})" if is_completed else f"1px solid rgba({rgb}, 0.5)"
+            shadow_style = f"box-shadow: 0 0 12px rgba({rgb}, 0.6);" if is_completed else ""
+            title_prefix = "🏆 " if is_completed else ""
+            
+            set_html = f"""
+            <div style='background-color: rgba({rgb}, 0.15); padding: 15px; border-radius: 10px; border: {border_style}; {shadow_style} margin-bottom: 15px;'>
+                <div style='font-weight: bold; margin-bottom: 8px;'>{title_prefix}Set {set_id}: {set_info['name']}</div>
+                <div style='width: 100%; background-color: rgba(128,128,128,0.2); border-radius: 5px; height: 8px; margin-bottom: 8px;'>
+                    <div style='width: {pct}%; background-color: rgb({rgb}); height: 100%; border-radius: 5px;'></div>
+                </div>
+                <div style='font-size: 0.9em; margin-bottom: 10px;'>Đã có: <b>{owned_count} / {total_in_set}</b> thẻ</div>
+                {breakdown_html}
+            </div>
+            """
+            st.markdown(set_html, unsafe_allow_html=True)
+
+
+def render_pack_opener_tab() -> None:
+    with st.container(border=True):
+        st.subheader("📊 Tổng Quan Mở Pack")
+        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+        
+        rarity_colors = {
+            1: "gray", 2: "#32CD32", 3: "#1E90FF",
+            4: "#9370DB", 5: "#FFA500", 6: "#FF1493"
+        }
+        
+        new_total = st.session_state.get('new_cards_drawn', 0)
+        new_dict = st.session_state.get('new_cards_by_rarity', {})
+        new_parts = []
+        for r in range(1, 7):
+            if new_dict.get(r, 0) > 0:
+                icon = "⭐" if r < 6 else "🌟"
+                new_parts.append(f"<span style='color:{rarity_colors[r]}'>{r}{icon}: {new_dict[r]}</span>")
+        new_detail = f"<div style='font-size:0.85em; margin-top:-10px; color:#aaa'>({', '.join(new_parts)})</div>" if new_parts else ""
+
+        dup_total = st.session_state.get('dup_cards_drawn', 0)
+        dup_dict = st.session_state.get('dup_cards_by_rarity', {})
+        dup_parts = []
+        for r in range(1, 7):
+            if dup_dict.get(r, 0) > 0:
+                icon = "⭐" if r < 6 else "🌟"
+                dup_parts.append(f"<span style='color:{rarity_colors[r]}'>{r}{icon}: {dup_dict[r]}</span>")
+        dup_detail = f"<div style='font-size:0.85em; margin-top:-10px; color:#aaa'>({', '.join(dup_parts)})</div>" if dup_parts else ""
+        
+        with col_stats1:
+            st.metric("⭐ Sao Tích Luỹ", f"{st.session_state['stars']}")
+        with col_stats2:
+            st.metric("🎴 Thẻ Mới Nhận", f"{new_total}")
+            if new_detail: st.markdown(new_detail, unsafe_allow_html=True)
+        with col_stats3:
+            st.metric("♻️ Thẻ Trùng (Đã rã)", f"{dup_total}")
+            if dup_detail: st.markdown(dup_detail, unsafe_allow_html=True)
+        with col_stats4:
+            st.metric("📦 Tổng Pack Đã Mở", f"{st.session_state['total_packs']}")
+        
+        st.markdown("<hr style='margin: 10px 0px; opacity: 0.3'>", unsafe_allow_html=True)
+        st.caption("Chi tiết số lượng từng gói đã mở:")
+        pack_cols = st.columns(5)
+        for i, pack in enumerate(PACK_ORDER):
+            with pack_cols[i % 5]:
+                st.markdown(f"**{PACK_ICONS[pack]} {pack}**: {st.session_state['pack_counts'][pack]}")
+            
+    st.markdown("<hr style='margin: 15px 0px; opacity: 0.3'>", unsafe_allow_html=True)
+    
+    col_left, col_right = st.columns([1, 1.2])
+    with col_left:
+        st.subheader("🛒 Giỏ Hàng")
+        st.caption("Nhập số lượng gói bạn muốn bóc (nhập 1 để bóc lẻ, nhập nhiều để bóc sỉ).")
+        shop_cols = st.columns(2)
+        for i, pack in enumerate(PACK_ORDER):
+            with shop_cols[i % 2]:
+                if f"cart_input_{pack}" not in st.session_state:
+                    st.session_state[f"cart_input_{pack}"] = st.session_state["cart_packs"].get(pack, 0)
+                st.number_input(f"{PACK_ICONS[pack]} {pack}", min_value=0, max_value=10000, step=1, key=f"cart_input_{pack}")
+                st.session_state["cart_packs"][pack] = st.session_state[f"cart_input_{pack}"]
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        auto_chest = st.checkbox("🔄 Tự động dùng sao dư để đổi Star Chest", value=False, help="Hệ thống sẽ tự động mua rương xịn nhất có thể (Vàng -> Bạc -> Đồng) cho đến khi không đủ sao (dưới 100 sao).")
+        def execute_cart():
+            res = open_bulk_packs(st.session_state, st.session_state["cart_packs"], auto_chest)
+            if not res["success"]:
+                st.session_state["cart_error"] = res["message"]
+            else:
+                st.session_state["cart_success"] = res
+        def reset_cart():
+            for p in PACK_ORDER:
+                st.session_state[f"cart_input_{p}"] = 0
+                st.session_state["cart_packs"][p] = 0
+
+        col_exec, col_reset = st.columns([3, 1])
+        col_exec.button("🚀 MỞ CÁC GÓI ĐÃ CHỌN", type="primary", use_container_width=True, on_click=execute_cart)
+        col_reset.button("🗑️ Xóa Giỏ Hàng", use_container_width=True, on_click=reset_cart)
+        if "cart_error" in st.session_state:
+            st.error(st.session_state.pop("cart_error"))
+        if "cart_success" in st.session_state:
+            res = st.session_state.pop("cart_success")
+            st.success(f"**ĐÃ MỞ THÀNH CÔNG!** {res['summary']}")
+            st.info(f"📦 Tổng thẻ rút được: +{res['total_cards']} | ⭐ Sao Nhận Về: +{res['stars_diff']}")
 
         st.markdown("<hr style='margin: 15px 0px; opacity: 0.3'>", unsafe_allow_html=True)
-        pack_cols = st.columns(len(PACK_ORDER))
-        for pack, col in zip(PACK_ORDER, pack_cols):
-            with col:
-                st.markdown(f"**{PACK_ICONS[pack]} {pack}**")
-                st.caption(f"{st.session_state['pack_counts'][pack]} gói")
+        st.subheader(f"🌟 Đổi Rương Sao (Hiện có {st.session_state['stars']} ⭐)")
+        st.caption("Dùng Sao dư thừa để đổi lấy rương thưởng đặc biệt.")
+        
+        def execute_chest(chest_type):
+            success, msg = open_chest(st.session_state, chest_type)
+            if success:
+                st.session_state["chest_success"] = msg
+            else:
+                st.session_state["chest_error"] = msg
 
+        chest_col1, chest_col2, chest_col3 = st.columns(3)
+        chest_col1.button("🥉 Bronze Chest (100⭐)", use_container_width=True, on_click=execute_chest, args=("Bronze",))
+        chest_col2.button("🥈 Silver Chest (250⭐)", use_container_width=True, on_click=execute_chest, args=("Silver",))
+        chest_col3.button("🥇 Gold Chest (500⭐)", use_container_width=True, on_click=execute_chest, args=("Gold",))
+        
+        if "chest_error" in st.session_state:
+            st.error(st.session_state.pop("chest_error"))
+        if "chest_success" in st.session_state:
+            st.success(st.session_state.pop("chest_success"))
 
-def render_main_content(selected_pack: str) -> None:
-    left_log, right_rate = st.columns([1.2, 1])
-
-    with left_log:
-        render_log_panel()
-
-    with right_rate:
+    with col_right:
+        selected_pack = st.selectbox("🔍 Xem bảng tỷ lệ rơi thẻ & Pity của gói:", PACK_ORDER)
         render_rate_panel(selected_pack)
+
+    st.divider()
+    render_log_panel()
 
 
 def render_log_panel() -> None:
@@ -433,7 +525,7 @@ def render_analytics_tab() -> None:
             st.button("📥 LƯU TOÀN BỘ PACKS VÀO GIỎ HÀNG", type="primary", on_click=add_packs_to_cart, args=(total,))
             
             if st.session_state.get("show_cart_success"):
-                st.success("✅ Đã thêm Packs vào Giỏ Hàng ở Sidebar! Bạn có thể sang tab Monte Carlo để mô phỏng.")
+                st.success("✅ Đã thêm Packs vào Giỏ Hàng! Bạn có thể sang tab **Mở Gói (Gacha)** hoặc **Monte Carlo Simulator** để tiến hành mở.")
                 st.session_state["show_cart_success"] = False
             
             st.divider()

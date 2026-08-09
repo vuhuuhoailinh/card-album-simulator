@@ -6,6 +6,8 @@ from .config import (
     RARITY_LABELS,
     STAR_VALUES,
     TOTAL_CARDS,
+    CARD_SETS,
+    CHEST_CONFIG,
 )
 from .state import total_cards_collected
 
@@ -37,6 +39,7 @@ def check_grand_album(session_state) -> None:
             completions = session_state.get("grand_album_completions", 0)
             if completions < 1:
                 session_state["inventory"] = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
+                session_state["owned_cards"] = set()
                 session_state["grand_album_completions"] = completions + 1
                 add_log(session_state, "🏆 CHÚC MỪNG! Đã hoàn thành Album. Chuyển sang vòng Grand Album!")
             elif completions == 1 and not session_state.get("grand_album_finished", False):
@@ -65,7 +68,39 @@ def calculate_new_chance(session_state, rarity: int, pack_type: str) -> float:
     return min(1.0, base_new ** final_power)
 
 
-def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str) -> tuple[str, int]:
+def pick_new_card(session_state, rarity: int):
+    possible_cards = []
+    from .config import CARD_SETS
+    for set_id, set_info in CARD_SETS.items():
+        if rarity in set_info["cards"]:
+            count = set_info["cards"][rarity]
+            for idx in range(count):
+                possible_cards.append((set_id, rarity, idx))
+                
+    missing_cards = [c for c in possible_cards if c not in session_state["owned_cards"]]
+    import random
+    if missing_cards:
+        chosen_card = random.choice(missing_cards)
+        session_state["owned_cards"].add(chosen_card)
+        return chosen_card
+    return None
+
+def pick_dup_card(session_state, rarity: int):
+    owned = [c for c in session_state["owned_cards"] if c[1] == rarity]
+    import random
+    if owned:
+        return random.choice(owned)
+    possible_cards = []
+    from .config import CARD_SETS
+    for set_id, set_info in CARD_SETS.items():
+        if rarity in set_info["cards"]:
+            count = set_info["cards"][rarity]
+            for idx in range(count):
+                possible_cards.append((set_id, rarity, idx))
+    return random.choice(possible_cards) if possible_cards else None
+
+def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str) -> tuple[str, int, tuple]:
+    session_state["total_cards_drawn"] += 1
     cards_owned = session_state["inventory"][rarity]
     max_cards = MAX_CARDS[rarity]
     
@@ -77,11 +112,19 @@ def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str) -> 
 
     if random.random() < final_chance:
         session_state["inventory"][rarity] += 1
+        c = pick_new_card(session_state, rarity)
+        session_state["new_cards_drawn"] += 1
+        session_state["new_cards_by_rarity"][rarity] += 1
         check_grand_album(session_state)
-        return "NEW", rarity
+        if "recent_draws" in session_state: session_state["recent_draws"].append(("NEW", rarity, c))
+        return "NEW", rarity, c
 
     session_state["stars"] += STAR_VALUES[rarity]
-    return "DUP", rarity
+    session_state["dup_cards_drawn"] += 1
+    session_state["dup_cards_by_rarity"][rarity] += 1
+    c = pick_dup_card(session_state, rarity)
+    if "recent_draws" in session_state: session_state["recent_draws"].append(("DUP", rarity, c))
+    return "DUP", rarity, c
 
 
 def open_pack(session_state, pack_type: str) -> None:
@@ -102,28 +145,28 @@ def open_pack(session_state, pack_type: str) -> None:
             weights=list(pack_config["weights"].values()),
         )[0]
         rarity = int(rarity_str)
-        status, final_rarity = roll_card(session_state, rarity, current_pity_bonus, pack_type)
+        status, final_rarity, specific_card = roll_card(session_state, rarity, current_pity_bonus, pack_type)
         if status == "NEW":
             got_new = True
             if session_state.get("total_packs", 0) > 5:
                 current_pity_bonus = 0.0 # Reset immediately when a new card is chosen
-        raw_results.append((status, final_rarity))
+        raw_results.append((status, final_rarity, specific_card))
 
     is_rainbow = (pack_type == "Rainbow")
     if is_rainbow:
-        wild_status, wild_rarity = open_rainbow_pack_guaranteed(session_state)
+        wild_status, wild_rarity, wild_specific_card = open_rainbow_pack_guaranteed(session_state)
         if wild_status == "NEW":
             got_new = True
             current_pity_bonus = 0.0
-        raw_results.append((wild_status, wild_rarity))
+        raw_results.append((wild_status, wild_rarity, wild_specific_card))
     else:
         guaranteed_tier = pack_config["guaranteed_tier"]
         guaranteed_rarity = guaranteed_tier
-        status, final_rarity = roll_card(session_state, guaranteed_rarity, current_pity_bonus, pack_type)
+        status, final_rarity, specific_card = roll_card(session_state, guaranteed_rarity, current_pity_bonus, pack_type)
         if status == "NEW":
             got_new = True
             current_pity_bonus = 0.0
-        raw_results.append((status, final_rarity))
+        raw_results.append((status, final_rarity, specific_card))
 
     # Sort by rarity ascending
     raw_results.sort(key=lambda x: x[1])
@@ -131,7 +174,7 @@ def open_pack(session_state, pack_type: str) -> None:
     pack_results = []
     tagged_guarantee = False
     
-    for status, rarity in raw_results:
+    for status, rarity, specific_card in raw_results:
         guaranteed = False
         if is_rainbow:
             # For Rainbow, just tag the first NEW one as the "guaranteed" if any
@@ -144,27 +187,40 @@ def open_pack(session_state, pack_type: str) -> None:
                 guaranteed = True
                 tagged_guarantee = True
                 
-        pack_results.append((status, rarity, guaranteed))
+        pack_results.append((status, rarity, specific_card, guaranteed))
 
     update_pity(session_state, pack_type, got_new)
     add_log(session_state, format_pack_log(session_state, pack_type, pack_results, pity_message, got_new))
 
 
-def open_rainbow_pack_guaranteed(session_state) -> tuple[str, int]:
+def open_rainbow_pack_guaranteed(session_state) -> tuple[str, int, tuple]:
+    session_state["total_cards_drawn"] += 1
     if session_state["inventory"][6] < MAX_CARDS[6]:
         session_state["inventory"][6] += 1
+        c = pick_new_card(session_state, 6)
+        session_state["new_cards_drawn"] += 1
+        session_state["new_cards_by_rarity"][6] += 1
         check_grand_album(session_state)
-        return "NEW", 6
+        if "recent_draws" in session_state: session_state["recent_draws"].append(("NEW", 6, c))
+        return "NEW", 6, c
 
     missing_rarities = [r for r in [1, 2, 3, 4, 5] if session_state["inventory"][r] < MAX_CARDS[r]]
     if missing_rarities:
         rarity = random.choice(missing_rarities)
         session_state["inventory"][rarity] += 1
+        c = pick_new_card(session_state, rarity)
+        session_state["new_cards_drawn"] += 1
+        session_state["new_cards_by_rarity"][rarity] += 1
         check_grand_album(session_state)
-        return "NEW", rarity
+        if "recent_draws" in session_state: session_state["recent_draws"].append(("NEW", rarity, c))
+        return "NEW", rarity, c
 
     session_state["stars"] += STAR_VALUES[6]
-    return "DUP", 6
+    session_state["dup_cards_drawn"] += 1
+    session_state["dup_cards_by_rarity"][6] += 1
+    c = pick_dup_card(session_state, 6)
+    if "recent_draws" in session_state: session_state["recent_draws"].append(("DUP", 6, c))
+    return "DUP", 6, c
 
 
 def update_pity(session_state, pack_type: str, got_new: bool) -> None:
@@ -175,12 +231,19 @@ def update_pity(session_state, pack_type: str, got_new: bool) -> None:
         session_state["pack_pity"][pack_type] += 1
 
 
-def format_pack_log(session_state, pack_type: str, pack_results: list[tuple[str, int, bool]], pity_message: str, got_new: bool) -> str:
+def format_card_name(card):
+    from .config import CARD_SETS
+    if not card: return "?"
+    set_id, rarity, idx = card
+    return f"{CARD_SETS[set_id]['name']} #{idx+1}"
+
+def format_pack_log(session_state, pack_type: str, pack_results: list[tuple[str, int, tuple, bool]], pity_message: str, got_new: bool) -> str:
     result_parts = []
-    for status, rarity, guaranteed in pack_results:
+    for status, rarity, specific_card, guaranteed in pack_results:
         label = f"{rarity}-Sao" if rarity < 6 else "Thẻ VÀNG"
+        cname = format_card_name(specific_card)
         suffix = " [Bảo Hiểm]" if guaranteed else ""
-        result_parts.append(f"{label} ({status}){suffix}")
+        result_parts.append(f"{label} [{cname}] ({status}){suffix}")
 
     card_rush_note = ", Card Rush" if "+" in pack_type else ""
 
@@ -193,19 +256,96 @@ def format_pack_log(session_state, pack_type: str, pack_results: list[tuple[str,
     )
 
 
-def open_bulk_packs(session_state, bulk_settings: dict[str, int]) -> tuple[bool, str]:
+def open_chest(session_state, chest_type: str) -> tuple[bool, str]:
+    if chest_type not in CHEST_CONFIG:
+        return False, f"⚠️ Không tìm thấy rương {chest_type}!"
+    cost = CHEST_CONFIG[chest_type]["cost"]
+    if session_state["stars"] < cost:
+        return False, f"⚠️ Không đủ Sao! Cần {cost}⭐ để mở Rương {chest_type}."
+    
+    session_state["stars"] -= cost
+    add_log(session_state, f"🌟 Đổi {cost}⭐ để mở {chest_type} Chest!")
+    packs_to_open = CHEST_CONFIG[chest_type]["packs"]
+    
+    # Check if card rush is enabled and apply +
+    is_cr = session_state.get("card_rush_enabled", False)
+    
+    for base_pack in packs_to_open:
+        pack_type = f"{base_pack}+" if is_cr and f"{base_pack}+" in session_state["config_packs"] else base_pack
+        open_pack(session_state, pack_type)
+        
+    return True, f"Mở thành công {chest_type} Chest!"
+
+def open_bulk_packs(session_state, bulk_settings: dict[str, int], auto_chest: bool = False) -> dict:
     total_to_open = sum(bulk_settings.values())
     if total_to_open == 0:
-        return False, "⚠️ Vui lòng chọn ít nhất 1 pack để mở!"
+        return {"success": False, "message": "⚠️ Vui lòng chọn ít nhất 1 pack để mở!"}
 
     add_log(session_state, f"========== BẮT ĐẦU MỞ NHIỀU ({total_to_open} PACKS) ==========")
+    session_state["recent_draws"] = []
+    start_new = session_state.get("new_cards_drawn", 0)
+    start_dup = session_state.get("dup_cards_drawn", 0)
+    start_total = session_state.get("total_cards_drawn", 0)
+    start_stars = session_state.get("stars", 0)
+    chests_opened = 0
+    chests_breakdown = {"Gold": 0, "Silver": 0, "Bronze": 0}
+    
     for pack_type, count in bulk_settings.items():
         for _ in range(count):
             open_pack(session_state, pack_type)
 
+    if auto_chest:
+        max_auto_chests = 500
+        while session_state["stars"] >= 100 and chests_opened < max_auto_chests:
+            if session_state["stars"] >= 500:
+                open_chest(session_state, "Gold")
+                chests_opened += 1
+                chests_breakdown["Gold"] += 1
+            elif session_state["stars"] >= 250:
+                open_chest(session_state, "Silver")
+                chests_opened += 1
+                chests_breakdown["Silver"] += 1
+            elif session_state["stars"] >= 100:
+                open_chest(session_state, "Bronze")
+                chests_opened += 1
+                chests_breakdown["Bronze"] += 1
+                
+        if session_state["stars"] >= 100 and chests_opened >= max_auto_chests:
+            add_log(session_state, "⚠️ Dừng tự động mở rương do đạt giới hạn an toàn (500 rương) để tránh treo máy!")
+
     summary = ", ".join(f"{count} {pack_type}" for pack_type, count in bulk_settings.items() if count > 0)
+    chest_parts = []
+    if chests_breakdown["Gold"] > 0: chest_parts.append(f"{chests_breakdown['Gold']} Rương Vàng")
+    if chests_breakdown["Silver"] > 0: chest_parts.append(f"{chests_breakdown['Silver']} Rương Bạc")
+    if chests_breakdown["Bronze"] > 0: chest_parts.append(f"{chests_breakdown['Bronze']} Rương Đồng")
+    
+    if chest_parts:
+        chest_str = " + ".join(chest_parts)
+        if summary: summary += f" + {chest_str}"
+        else: summary = chest_str
     add_log(session_state, f"🌟 HOÀN THÀNH MỞ: {summary}")
-    return True, f"Đã mở thành công {total_to_open} pack!"
+    
+    new_drawn = session_state.get("new_cards_drawn", 0) - start_new
+    dup_drawn = session_state.get("dup_cards_drawn", 0) - start_dup
+    total_drawn = session_state.get("total_cards_drawn", 0) - start_total
+    stars_diff = session_state.get("stars", 0) - start_stars
+    
+    new_cards_list = [c for s, r, c in session_state.get("recent_draws", []) if s == "NEW"]
+    dup_cards_list = [c for s, r, c in session_state.get("recent_draws", []) if s == "DUP"]
+    if "recent_draws" in session_state: del session_state["recent_draws"]
+
+    return {
+        "success": True, 
+        "message": f"Đã mở thành công {total_to_open} pack!",
+        "summary": summary,
+        "new_cards": new_drawn,
+        "dup_cards": dup_drawn,
+        "total_cards": total_drawn,
+        "stars_diff": stars_diff,
+        "chests_opened": chests_opened,
+        "new_cards_list": new_cards_list,
+        "dup_cards_list": dup_cards_list
+    }
 
 
 def add_log(session_state, entry: str) -> None:

@@ -50,12 +50,26 @@ def ensure_album_state(session_state) -> None:
     else:
         for pack in PACK_ORDER:
             session_state["cart_packs"].setdefault(pack, 0)
+    if "owned_cards" not in session_state:
+        session_state["owned_cards"] = set()
+    if "total_cards_drawn" not in session_state:
+        session_state["total_cards_drawn"] = 0
+    if "new_cards_drawn" not in session_state:
+        session_state["new_cards_drawn"] = 0
+    if "dup_cards_drawn" not in session_state:
+        session_state["dup_cards_drawn"] = 0
+    if "new_cards_by_rarity" not in session_state:
+        session_state["new_cards_by_rarity"] = {r: 0 for r in range(1, 7)}
+    if "dup_cards_by_rarity" not in session_state:
+        session_state["dup_cards_by_rarity"] = {r: 0 for r in range(1, 7)}
 
 
 def reset_progress(session_state) -> None:
     keys_to_clear = [
         "inventory", "stars", "total_packs", "pack_counts", 
-        "pack_pity", "log", "grand_album_completions", "grand_album_finished"
+        "pack_pity", "log", "grand_album_completions", "grand_album_finished",
+        "owned_cards", "total_cards_drawn", "new_cards_drawn", "dup_cards_drawn",
+        "new_cards_by_rarity", "dup_cards_by_rarity"
     ]
     for k in keys_to_clear:
         session_state.pop(k, None)
