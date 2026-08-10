@@ -224,6 +224,57 @@ def render_inventory_tab() -> None:
             """
             st.markdown(set_html, unsafe_allow_html=True)
 
+@st.dialog("🎉 BẠN VỪA NHẬN ĐƯỢC!", width="large")
+def show_draw_result_dialog(res: dict):
+    st.markdown(f"**🌟 MỞ THÀNH CÔNG: {res.get('summary', '')}**")
+    st.info(f"📦 Tổng thẻ rút được: +{res.get('total_cards', 0)} | ⭐ Sao Nhận Về: +{res.get('stars_diff', 0)}")
+    
+    rarity_colors = {
+        1: "#B0C4DE", 2: "#32CD32", 3: "#1E90FF",
+        4: "#9370DB", 5: "#FFA500", 6: "#FFD700"
+    }
+    
+    def render_card_html(card, is_new):
+        from .config import CARD_SETS
+        from .gacha import STAR_VALUES
+        if not card: return ""
+        set_id, r, idx = card
+        cname = f"{CARD_SETS[set_id]['name']} #{idx+1}"
+        color = rarity_colors.get(r, "gray")
+        icon = "⭐" * r if r < 6 else "🌟"
+        
+        box_shadow = f"box-shadow: 0 0 15px {color};" if is_new else ""
+        opacity = "1.0" if is_new else "0.6"
+        
+        if color.startswith("#") and len(color) == 7:
+            r_val, g_val, b_val = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+            bg = f"rgba({r_val}, {g_val}, {b_val}, 0.15)"
+        else:
+            bg = "rgba(128, 128, 128, 0.15)"
+            
+        badge = f"<div style='position:absolute; top:-10px; right:-10px; background:red; color:white; font-size:0.7em; padding:2px 6px; border-radius:10px; font-weight:bold; box-shadow: 0 0 5px red;'>NEW</div>" if is_new else f"<div style='position:absolute; top:-10px; right:-10px; background:gray; color:white; font-size:0.7em; padding:2px 6px; border-radius:10px; font-weight:bold;'>+{STAR_VALUES[r]}⭐</div>"
+        
+        return f"<div style='position:relative; width: 100px; height: 130px; border: 2px solid {color}; border-radius: 8px; padding: 5px; text-align: center; margin: 8px; background: {bg}; {box_shadow} opacity: {opacity}; display: inline-block; vertical-align: top;'>{badge}<div style='font-size: 0.8em; margin-bottom: 5px; margin-top: 10px;'>{icon}</div><div style='font-size: 0.75em; font-weight: bold; line-height: 1.2; word-wrap: break-word;'>{cname}</div></div>"
+        
+    new_cards = res.get("new_cards_list", [])
+    dup_cards = res.get("dup_cards_list", [])
+    
+    if new_cards:
+        st.subheader("✨ THẺ MỚI NHẬN")
+        html_parts = [render_card_html(c, True) for c in new_cards]
+        st.markdown("<div>" + "".join(html_parts) + "</div>", unsafe_allow_html=True)
+        
+    if dup_cards:
+        st.subheader("♻️ THẺ TRÙNG (Đổi thành Sao)")
+        html_parts = [render_card_html(c, False) for c in dup_cards]
+        st.markdown("<div>" + "".join(html_parts) + "</div>", unsafe_allow_html=True)
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🎉 THU THẬP", use_container_width=True, type="primary"):
+        st.rerun()
+
+
+
 
 def render_pack_opener_tab() -> None:
     with st.container(border=True):
@@ -286,9 +337,9 @@ def render_pack_opener_tab() -> None:
                 st.session_state["cart_packs"][pack] = st.session_state[f"cart_input_{pack}"]
 
         st.markdown("<br>", unsafe_allow_html=True)
-        auto_chest = st.checkbox("🔄 Tự động dùng sao dư để đổi Star Chest", value=False, help="Hệ thống sẽ tự động mua rương xịn nhất có thể (Vàng -> Bạc -> Đồng) cho đến khi không đủ sao (dưới 100 sao).")
+        auto_chest = st.checkbox("🔄 Tự động dùng sao dư để đổi Star Chest", key="auto_chest_chk", help="Hệ thống sẽ tự động mua rương xịn nhất có thể (Vàng -> Bạc -> Đồng) cho đến khi không đủ sao (dưới 100 sao).")
         def execute_cart():
-            res = open_bulk_packs(st.session_state, st.session_state["cart_packs"], auto_chest)
+            res = open_bulk_packs(st.session_state, st.session_state["cart_packs"], st.session_state.get("auto_chest_chk", False))
             if not res["success"]:
                 st.session_state["cart_error"] = res["message"]
             else:
@@ -304,20 +355,18 @@ def render_pack_opener_tab() -> None:
         if "cart_error" in st.session_state:
             st.error(st.session_state.pop("cart_error"))
         if "cart_success" in st.session_state:
-            res = st.session_state.pop("cart_success")
-            st.success(f"**ĐÃ MỞ THÀNH CÔNG!** {res['summary']}")
-            st.info(f"📦 Tổng thẻ rút được: +{res['total_cards']} | ⭐ Sao Nhận Về: +{res['stars_diff']}")
+            show_draw_result_dialog(st.session_state.pop("cart_success"))
 
         st.markdown("<hr style='margin: 15px 0px; opacity: 0.3'>", unsafe_allow_html=True)
         st.subheader(f"🌟 Đổi Rương Sao (Hiện có {st.session_state['stars']} ⭐)")
         st.caption("Dùng Sao dư thừa để đổi lấy rương thưởng đặc biệt.")
         
         def execute_chest(chest_type):
-            success, msg = open_chest(st.session_state, chest_type)
-            if success:
-                st.session_state["chest_success"] = msg
+            res = open_chest(st.session_state, chest_type)
+            if res["success"]:
+                st.session_state["chest_success"] = res
             else:
-                st.session_state["chest_error"] = msg
+                st.session_state["chest_error"] = res["message"]
 
         chest_col1, chest_col2, chest_col3 = st.columns(3)
         chest_col1.button("🥉 Bronze Chest (100⭐)", use_container_width=True, on_click=execute_chest, args=("Bronze",))
@@ -327,10 +376,28 @@ def render_pack_opener_tab() -> None:
         if "chest_error" in st.session_state:
             st.error(st.session_state.pop("chest_error"))
         if "chest_success" in st.session_state:
-            st.success(st.session_state.pop("chest_success"))
+            show_draw_result_dialog(st.session_state.pop("chest_success"))
 
     with col_right:
-        selected_pack = st.selectbox("🔍 Xem bảng tỷ lệ rơi thẻ & Pity của gói:", PACK_ORDER)
+        selected_pack = st.selectbox("🔍 Chọn Pack:", PACK_ORDER)
+        
+        def execute_single_pack(pack):
+            res = open_bulk_packs(st.session_state, {pack: 1}, False)
+            if res["success"]:
+                st.session_state["single_success"] = res
+            else:
+                st.session_state["single_error"] = res["message"]
+                
+        st.button(f"🎟️ Mở 1 gói {selected_pack}", type="primary", use_container_width=True, on_click=execute_single_pack, args=(selected_pack,))
+        
+        if "single_error" in st.session_state:
+            st.error(st.session_state.pop("single_error"))
+        if "single_success" in st.session_state:
+            res = st.session_state.pop("single_success")
+            res["summary"] = f"1 gói {selected_pack}"
+            show_draw_result_dialog(res)
+            
+        st.markdown("<hr style='margin: 10px 0px; opacity: 0.3'>", unsafe_allow_html=True)
         render_rate_panel(selected_pack)
 
     st.divider()

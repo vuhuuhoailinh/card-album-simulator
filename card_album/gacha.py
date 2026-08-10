@@ -256,12 +256,15 @@ def format_pack_log(session_state, pack_type: str, pack_results: list[tuple[str,
     )
 
 
-def open_chest(session_state, chest_type: str) -> tuple[bool, str]:
+def open_chest(session_state, chest_type: str) -> dict:
     if chest_type not in CHEST_CONFIG:
-        return False, f"⚠️ Không tìm thấy rương {chest_type}!"
+        return {"success": False, "message": f"⚠️ Không tìm thấy rương {chest_type}!"}
     cost = CHEST_CONFIG[chest_type]["cost"]
     if session_state["stars"] < cost:
-        return False, f"⚠️ Không đủ Sao! Cần {cost}⭐ để mở Rương {chest_type}."
+        return {"success": False, "message": f"⚠️ Không đủ Sao! Cần {cost}⭐ để mở Rương {chest_type}."}
+    
+    start_total = session_state.get("total_cards_drawn", 0)
+    start_stars = session_state.get("stars", 0)
     
     session_state["stars"] -= cost
     add_log(session_state, f"🌟 Đổi {cost}⭐ để mở {chest_type} Chest!")
@@ -270,18 +273,44 @@ def open_chest(session_state, chest_type: str) -> tuple[bool, str]:
     # Check if card rush is enabled and apply +
     is_cr = session_state.get("card_rush_enabled", False)
     
+    has_recent = "recent_draws" in session_state
+    if not has_recent:
+        session_state["recent_draws"] = []
+        
+    opened_packs = []
     for base_pack in packs_to_open:
         pack_type = f"{base_pack}+" if is_cr and f"{base_pack}+" in session_state["config_packs"] else base_pack
         open_pack(session_state, pack_type)
+        opened_packs.append(pack_type)
         
-    return True, f"Mở thành công {chest_type} Chest!"
+    total_drawn = session_state.get("total_cards_drawn", 0) - start_total
+    stars_diff = session_state.get("stars", 0) - start_stars
+    
+    # We only slice the recent_draws added during THIS chest if has_recent was True, but actually returning everything is fine if it's ignored by open_bulk_packs
+    new_cards_list = [c for s, r, c in session_state.get("recent_draws", []) if s == "NEW"]
+    dup_cards_list = [c for s, r, c in session_state.get("recent_draws", []) if s == "DUP"]
+    
+    if not has_recent:
+        del session_state["recent_draws"]
+    
+    return {
+        "success": True,
+        "chest_type": chest_type,
+        "message": f"Mở thành công {chest_type} Chest!",
+        "summary": ", ".join(opened_packs),
+        "total_cards": total_drawn,
+        "stars_diff": stars_diff,
+        "new_cards_list": new_cards_list,
+        "dup_cards_list": dup_cards_list
+    }
 
 def open_bulk_packs(session_state, bulk_settings: dict[str, int], auto_chest: bool = False) -> dict:
     total_to_open = sum(bulk_settings.values())
     if total_to_open == 0:
         return {"success": False, "message": "⚠️ Vui lòng chọn ít nhất 1 pack để mở!"}
 
-    add_log(session_state, f"========== BẮT ĐẦU MỞ NHIỀU ({total_to_open} PACKS) ==========")
+    if total_to_open > 1:
+        add_log(session_state, f"========== BẮT ĐẦU MỞ NHIỀU ({total_to_open} PACKS) ==========")
     session_state["recent_draws"] = []
     start_new = session_state.get("new_cards_drawn", 0)
     start_dup = session_state.get("dup_cards_drawn", 0)
@@ -323,7 +352,9 @@ def open_bulk_packs(session_state, bulk_settings: dict[str, int], auto_chest: bo
         chest_str = " + ".join(chest_parts)
         if summary: summary += f" + {chest_str}"
         else: summary = chest_str
-    add_log(session_state, f"🌟 HOÀN THÀNH MỞ: {summary}")
+    
+    if total_to_open > 1 or chests_opened > 0:
+        add_log(session_state, f"🌟 HOÀN THÀNH MỞ: {summary}")
     
     new_drawn = session_state.get("new_cards_drawn", 0) - start_new
     dup_drawn = session_state.get("dup_cards_drawn", 0) - start_dup
