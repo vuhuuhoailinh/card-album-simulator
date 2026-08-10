@@ -226,6 +226,16 @@ def render_inventory_tab() -> None:
 
 @st.dialog("🎉 BẠN VỪA NHẬN ĐƯỢC!", width="large")
 def show_draw_result_dialog(res: dict):
+    st.markdown("""
+        <style>
+            /* Hack to make the dialog wider on desktop screens */
+            div[data-testid="stDialog"] div[role="dialog"] {
+                width: 85vw !important;
+                max-width: 1200px !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    
     st.markdown(f"**🌟 MỞ THÀNH CÔNG: {res.get('summary', '')}**")
     st.info(f"📦 Tổng thẻ rút được: +{res.get('total_cards', 0)} | ⭐ Sao Nhận Về: +{res.get('stars_diff', 0)}")
     
