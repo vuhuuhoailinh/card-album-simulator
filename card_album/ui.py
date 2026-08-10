@@ -381,20 +381,26 @@ def render_pack_opener_tab() -> None:
     with col_right:
         selected_pack = st.selectbox("🔍 Chọn Pack:", PACK_ORDER)
         
-        def execute_single_pack(pack):
-            res = open_bulk_packs(st.session_state, {pack: 1}, False)
+        def execute_multi_pack(pack, count):
+            res = open_bulk_packs(st.session_state, {pack: count}, False)
             if res["success"]:
                 st.session_state["single_success"] = res
+                st.session_state["single_success_count"] = count
+                st.session_state["single_success_pack"] = pack
             else:
                 st.session_state["single_error"] = res["message"]
                 
-        st.button(f"🎟️ Mở 1 gói {selected_pack}", type="primary", use_container_width=True, on_click=execute_single_pack, args=(selected_pack,))
+        col_btn1, col_btn10 = st.columns(2)
+        col_btn1.button(f"🎟️ Mở 1 gói", type="primary", use_container_width=True, on_click=execute_multi_pack, args=(selected_pack, 1))
+        col_btn10.button(f"🎟️ Mở 10 gói", type="primary", use_container_width=True, on_click=execute_multi_pack, args=(selected_pack, 10))
         
         if "single_error" in st.session_state:
             st.error(st.session_state.pop("single_error"))
         if "single_success" in st.session_state:
             res = st.session_state.pop("single_success")
-            res["summary"] = f"1 gói {selected_pack}"
+            count = st.session_state.pop("single_success_count")
+            pack = st.session_state.pop("single_success_pack")
+            res["summary"] = f"{count} gói {pack}"
             show_draw_result_dialog(res)
             
         st.markdown("<hr style='margin: 10px 0px; opacity: 0.3'>", unsafe_allow_html=True)
