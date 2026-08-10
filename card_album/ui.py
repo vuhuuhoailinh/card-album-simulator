@@ -264,20 +264,20 @@ def show_draw_result_dialog(res: dict):
             
         badge = f"<div style='position:absolute; top:-10px; right:-10px; background:red; color:white; font-size:0.7em; padding:2px 6px; border-radius:10px; font-weight:bold; box-shadow: 0 0 5px red;'>NEW</div>" if is_new else f"<div style='position:absolute; top:-10px; right:-10px; background:gray; color:white; font-size:0.7em; padding:2px 6px; border-radius:10px; font-weight:bold;'>+{STAR_VALUES[r]}⭐</div>"
         
-        return f"<div style='position:relative; width: 100px; height: 130px; border: 2px solid {color}; border-radius: 8px; padding: 5px; text-align: center; margin: 8px; background: {bg}; {box_shadow} opacity: {opacity}; display: inline-block; vertical-align: top;'>{badge}<div style='font-size: 0.8em; margin-bottom: 5px; margin-top: 10px;'>{icon}</div><div style='font-size: 0.75em; font-weight: bold; line-height: 1.2; word-wrap: break-word;'>{cname}</div></div>"
+        return f"<div style='position:relative; width: 100px; height: 130px; border: 2px solid {color}; border-radius: 8px; padding: 5px; text-align: center; background: {bg}; {box_shadow} opacity: {opacity}; display: flex; flex-direction: column; justify-content: space-between;'>{badge}<div style='font-size: 0.8em; margin-top: 10px;'>{icon}</div><div style='font-size: 0.75em; font-weight: bold; line-height: 1.2; word-wrap: break-word; margin-bottom: 5px;'>{cname}</div></div>"
         
     new_cards = res.get("new_cards_list", [])
     dup_cards = res.get("dup_cards_list", [])
     
     if new_cards:
-        st.subheader("✨ THẺ MỚI NHẬN")
+        st.markdown("<h3>✨ THẺ MỚI NHẬN</h3>", unsafe_allow_html=True)
         html_parts = [render_card_html(c, True) for c in new_cards]
-        st.markdown("<div>" + "".join(html_parts) + "</div>", unsafe_allow_html=True)
+        st.markdown("<div style='display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 20px;'>" + "".join(html_parts) + "</div>", unsafe_allow_html=True)
         
     if dup_cards:
-        st.subheader("♻️ THẺ TRÙNG (Đổi thành Sao)")
+        st.markdown("<h3>♻️ THẺ TRÙNG (Đổi thành Sao)</h3>", unsafe_allow_html=True)
         html_parts = [render_card_html(c, False) for c in dup_cards]
-        st.markdown("<div>" + "".join(html_parts) + "</div>", unsafe_allow_html=True)
+        st.markdown("<div style='display: flex; flex-wrap: wrap; justify-content: center; gap: 15px;'>" + "".join(html_parts) + "</div>", unsafe_allow_html=True)
         
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🎉 THU THẬP", use_container_width=True, type="primary"):
@@ -337,7 +337,7 @@ def render_pack_opener_tab() -> None:
     col_left, col_right = st.columns([1, 1.2])
     with col_left:
         st.subheader("🛒 Giỏ Hàng")
-        st.caption("Nhập số lượng gói bạn muốn bóc (nhập 1 để bóc lẻ, nhập nhiều để bóc sỉ).")
+        st.caption("Nhập số lượng gói bạn muốn mở.")
         shop_cols = st.columns(2)
         for i, pack in enumerate(PACK_ORDER):
             with shop_cols[i % 2]:
