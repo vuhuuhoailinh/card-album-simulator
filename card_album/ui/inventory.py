@@ -49,7 +49,9 @@ def render_inventory_tab() -> None:
             st.markdown("<div style='margin-top:-15px; color:#888; font-weight:bold;'>Thường</div>", unsafe_allow_html=True)
             
     col2.metric("⭐ Tổng Sao Hiện Có", f"{st.session_state['stars']}")
-    col3.metric("📈 Thẻ Mới / Thẻ Trùng", f"{st.session_state.get('new_cards_drawn', 0)} / {st.session_state.get('dup_cards_drawn', 0)}")
+    total_new = st.session_state.get('new_cards_drawn', 0) + st.session_state.get('cd_new_cards_drawn', 0)
+    total_dup = st.session_state.get('dup_cards_drawn', 0) + st.session_state.get('cd_dup_cards_drawn', 0)
+    col3.metric("📈 Thẻ Mới / Thẻ Trùng", f"{total_new} / {total_dup}")
     
     st.divider()
     st.subheader("Tiến độ theo Độ Hiếm")
