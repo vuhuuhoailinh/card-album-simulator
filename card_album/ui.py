@@ -1165,7 +1165,7 @@ def render_chest_drop_tab() -> None:
             st.session_state.cd_total_bulk_opened = total_bulk
             st.rerun()
             
-        col_reset.button("🗑️ Xoá giỏ hàng", use_container_width=True, on_click=reset_cart_cd)
+        col_reset.button("🗑️ Xoá giỏ", use_container_width=True, on_click=reset_cart_cd)
                 
         if st.session_state.get('cd_show_bulk_result', False):
             st.session_state.cd_show_bulk_result = False
