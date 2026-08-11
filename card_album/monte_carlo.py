@@ -50,7 +50,7 @@ def render_monte_carlo_tab():
             
     if "mc_results" in st.session_state:
         res = st.session_state["mc_results"]
-        render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_chests)
+        render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_chests, auto_chest)
 
 
 def run_monte_carlo(base_state, cart_packs, cart_chests, iterations, simulate_from_scratch=True, auto_chest=False):
@@ -130,39 +130,46 @@ def run_monte_carlo(base_state, cart_packs, cart_chests, iterations, simulate_fr
     }
 
 
-def render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_chests):
+def render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_chests, auto_chest):
     st.divider()
     st.subheader(f"📈 Kết quả sau {iterations} lần chạy")
     
     df = pd.DataFrame(res)
     
-    # Metrics
-    avg_cards = df["cards"].mean()
-    max_cards = df["cards"].max()
-    min_cards = df["cards"].min()
-    
-    avg_stars = df["stars"].mean()
-    
     # Calculate completions
     start_completions = 0 if st.session_state.get("simulate_from_scratch", True) else st.session_state.get("grand_album_completions", 0)
-    # A run is considered to have completed the album if its final completions > start_completions
-    # OR if it was already finished, but we'll assume we care about new completions
+    start_inventory = 0 if st.session_state.get("simulate_from_scratch", True) else sum(st.session_state["inventory"].values())
+    start_total_cards = start_completions * TOTAL_CARDS + start_inventory
+    start_stars = 0 if st.session_state.get("simulate_from_scratch", True) else st.session_state.get("stars", 0)
+    
+    # Metrics (Deltas)
+    avg_cards_gained = df["cards"].mean() - start_total_cards
+    max_cards_gained = df["cards"].max() - start_total_cards
+    min_cards_gained = df["cards"].min() - start_total_cards
+    
     completions = df[df["grand_albums"] > start_completions]
     completion_rate = len(completions) / iterations * 100
     
     avg_dups = df.get("total_dups", pd.Series([0])).mean()
-    avg_stars_earned = df.get("total_stars_earned", pd.Series([0])).mean()
+    
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Hoàn thành Album", f"{completion_rate:.1f}%")
-    c2.metric("Trung bình Thẻ (Tổng)", f"{avg_cards:.1f}")
+    c2.metric("Thẻ Mới Thu Thập", f"{avg_cards_gained:.1f}")
     c3.metric("Thẻ Trùng (Dups)", f"{avg_dups:.1f}")
-    c4.metric("Max Thẻ (Hên)", f"{max_cards}")
-    c5.metric("Min Thẻ (Xui)", f"{min_cards}")
+    c4.metric("Max Thẻ Mới", f"{max_cards_gained}")
+    c5.metric("Min Thẻ Mới", f"{min_cards_gained}")
     
     st.write("")
     c6, c7, c8, c9, c10 = st.columns(5)
-    c6.metric("Trung bình Sao nhận được", f"{avg_stars_earned:.0f} ⭐")
-    c7.metric("Sao Còn Lại (Dư thừa)", f"{avg_stars:.0f} ⭐")
+    
+    if auto_chest:
+        avg_stars = df["stars"].mean()
+        c6.metric("Trung bình Sao Dư Thừa", f"{avg_stars:.0f} ⭐")
+    else:
+        avg_stars_gained = df["stars"].mean() - start_stars
+        c6.metric("Trung bình Sao Nhận Được", f"{avg_stars_gained:.0f} ⭐")
+        
+    c7.empty()
     c8.empty()
     c9.empty()
     c10.empty()
