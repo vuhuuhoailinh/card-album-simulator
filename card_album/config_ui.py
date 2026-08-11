@@ -14,14 +14,19 @@ def init_draft_config():
         st.session_state["draft_new_card_formula_type"] = st.session_state.get("new_card_formula_type", "simple")
     if "draft_new_card_power" not in st.session_state:
         st.session_state["draft_new_card_power"] = st.session_state.get("new_card_power", 3.0)
+    if "draft_chest_drop_x" not in st.session_state:
+        st.session_state["draft_chest_drop_x"] = st.session_state.get("config_chest_drop_x", 2.0)
+    if "draft_config_chest_drop_tiers" not in st.session_state:
+        st.session_state["draft_config_chest_drop_tiers"] = copy.deepcopy(st.session_state.get("config_chest_drop_tiers", {}))
 
 def clear_draft_config():
     keys_to_clear = [
         "draft_config_packs", "draft_config_rewards", 
         "draft_new_card_formula_type", "draft_new_card_power",
+        "draft_chest_drop_x", "draft_config_chest_drop_tiers",
         "pack_config_editor", "reward_editor_master_pass_free",
         "reward_editor_win_streak_rewards", "reward_editor_master_pass_premium",
-        "reward_editor_key_collection_rewards"
+        "reward_editor_key_collection_rewards", "chest_drop_tiers_editor"
     ]
     for key in keys_to_clear:
         st.session_state.pop(key, None)
@@ -101,15 +106,67 @@ def render_config_tab():
         """)
 
     # ----------------- SYSTEM CONFIG -----------------
-    st.subheader("⚙️ Thông số Hệ thống")
+    st.subheader("⚙️ Công Thức Rớt Thẻ Mới (New Card Ratio)")
+    
+    st.markdown("### 1. Gacha Cơ Bản (Mở Gói)")
     power = st.session_state["draft_new_card_power"]
     new_power = st.slider(
-        "Hệ số Khó chung (x) theo công thức tính tỉ lệ rớt thẻ MỚI: **New Card Ratio = (Remaining New/Total)^(x+y) + Pity**", 
+        "Hệ số Khó chung (x) theo công thức: **New Card Ratio = (Remaining New/Total)^(x+y) + Pity**", 
         min_value=0.1, max_value=5.0, value=float(power), step=0.1, 
         help="Hệ số lũy thừa x. Giá trị càng cao, khi bạn sưu tập được càng nhiều thẻ thì cơ hội ra thẻ mới càng nhỏ."
     )
     st.session_state["draft_new_card_formula_type"] = "document"
-            
+    st.caption("Lưu ý: Hệ số y sẽ phụ thuộc vào từng loại Pack (Cấu hình ở bảng bên dưới).")
+    
+    st.write("")
+    st.markdown("### 2. Đập Rương (Chest Drop)")
+    
+    chest_x = st.session_state["draft_chest_drop_x"]
+    new_chest_x = st.slider(
+        "Hệ số Khó chung của Đập Rương (x): **New Card Ratio = (Remaining New/Total)^(x+y)**", 
+        min_value=0.1, max_value=5.0, value=float(chest_x), step=0.1,
+        help="Hệ số x cho Đập Rương. Hệ số y sẽ phụ thuộc trực tiếp vào độ hiếm của thẻ (1-Sao y=1.0, 2-Sao y=0.5, 3-Sao y=0.0, 4-Sao y=-0.5, 5-Sao y=-1.0, 6-Sao y=-1.5)."
+    )
+    
+    st.markdown("**Bảng Cấu Hình Tỉ Lệ Đập Rương (Chest Drop Tiers):**")
+    st.caption("Cấu hình tỉ lệ thăng cấp, hệ số y_value và trọng số rớt thẻ (weights) cho từng cấp rương.")
+    
+    chest_tiers_data = []
+    draft_tiers = st.session_state["draft_config_chest_drop_tiers"]
+    
+    for tier in range(1, 6):
+        tier_str = str(tier)
+        t_cfg = draft_tiers[tier_str]
+        row = {
+            "Cấp Rương": t_cfg["name"],
+            "Upgrade": t_cfg["upgrade_chance"],
+            "y_value": t_cfg["y_value"],
+        }
+        for i in range(1, 7):
+            col_name = f"Star_{i}" if i < 6 else "Gold"
+            row[col_name] = t_cfg["weights"].get(str(i), 0)
+        chest_tiers_data.append(row)
+        
+    df_chest_tiers = pd.DataFrame(chest_tiers_data)
+    
+    chest_col_config = {
+        "Cấp Rương": st.column_config.TextColumn("Cấp Rương", disabled=True),
+        "Upgrade": st.column_config.NumberColumn("Upgrade", min_value=0.0, max_value=1.0, step=0.01, help="Tỉ lệ thăng cấp lên rương tiếp theo (Ví dụ 0.35 = 35%)"),
+        "y_value": st.column_config.NumberColumn("y_value", help="Hệ số độ khó (y) khi đập rương này."),
+    }
+    for i in range(1, 7):
+        col_name = f"Star_{i}" if i < 6 else "Gold"
+        label_help = f"{i}-Sao" if i < 6 else "Thẻ VÀNG (6-Sao)"
+        chest_col_config[col_name] = st.column_config.NumberColumn(col_name, help=f"Trọng số bốc trúng độ hiếm {label_help}. Số càng to tỉ lệ càng cao.")
+        
+    edited_chest_tiers = st.data_editor(
+        df_chest_tiers,
+        hide_index=True,
+        use_container_width=True,
+        key="chest_drop_tiers_editor",
+        column_config=chest_col_config
+    )
+    
     st.divider()
     
     # ----------------- PACKS CONFIG -----------------
@@ -181,6 +238,20 @@ def render_config_tab():
         st.session_state["draft_new_card_power"] = new_power
         st.session_state["new_card_formula_type"] = "document"
         st.session_state["new_card_power"] = new_power
+        
+        st.session_state["draft_chest_drop_x"] = new_chest_x
+        st.session_state["config_chest_drop_x"] = new_chest_x
+        
+        # Apply Chest Tiers Config
+        for idx, row in edited_chest_tiers.iterrows():
+            tier_str = str(idx + 1)
+            t = st.session_state["draft_config_chest_drop_tiers"][tier_str]
+            t["upgrade_chance"] = float(row["Upgrade"])
+            t["y_value"] = float(row["y_value"])
+            for i in range(1, 7):
+                col_name = f"Star_{i}" if i < 6 else "Gold"
+                t["weights"][str(i)] = int(row[col_name])
+        st.session_state["config_chest_drop_tiers"] = copy.deepcopy(st.session_state["draft_config_chest_drop_tiers"])
         
         # Apply Packs Config
         for idx, row in edited_packs.iterrows():

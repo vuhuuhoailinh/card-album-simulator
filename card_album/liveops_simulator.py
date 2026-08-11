@@ -283,7 +283,13 @@ def simulate_liveops(days: int, levels_per_weekday: int, levels_per_weekend: int
     if toggles.get("master_pass"):
         mp = simulate_master_pass(days, levels_per_weekday, levels_per_weekend, toggles.get("master_pass_premium", False), cr_enabled, cr_detailed_logs, config_rewards)
         for p, v in mp["packs"].items(): result_packs[p] += v
-        all_logs["master_pass"] = mp["logs"]        
+        all_logs["master_pass"] = mp["logs"]
+        
+    chest_drop_res = {"chests": {1: 0, 2: 0, 3: 0}, "logs": []}
+    if toggles.get("chest_drop", True):
+        from .liveops_simulator import simulate_chest_drop
+        chest_drop_res = simulate_chest_drop(days, levels_per_weekday, levels_per_weekend)
+        all_logs["chest_drop"] = chest_drop_res["logs"]
     iap_summary = {p: 0 for p in PACK_ORDER}
     total_spent = 0.0
     total_iap_bought = 0
@@ -392,7 +398,32 @@ def simulate_liveops(days: int, levels_per_weekday: int, levels_per_weekend: int
         "logs": all_logs,
         "iap_packs": iap_summary,
         "total_packs": result_packs,
+        "chest_drop_chests": chest_drop_res["chests"] if 'chest_drop_res' in locals() else {1:0, 2:0, 3:0},
         "total_spent": total_spent,
         "bonus_cards": bonus_cards,
         "source_breakdown": source_breakdown
     }
+
+
+def simulate_chest_drop(days: int, levels_per_weekday: int, levels_per_weekend: int) -> dict:
+    chests = {1: 0, 2: 0, 3: 0}
+    logs = ["**Lưu ý:** Chest Drop tính năng chạy và reset vào 0h mỗi ngày."]
+    for day in range(1, days + 1):
+        weekday = (day - 1) % 7 + 1
+        lpd = levels_per_weekend if weekday in (5, 6, 7) else levels_per_weekday
+        daily_chests = []
+        if lpd >= 3: 
+            chests[1] += 1
+            daily_chests.append("1-Sao")
+        if lpd >= 7: 
+            chests[2] += 1
+            daily_chests.append("2-Sao")
+        if lpd >= 12: 
+            chests[3] += 1
+            daily_chests.append("3-Sao")
+            
+        if daily_chests:
+            logs.append(f"Ngày {day} ({get_day_string(day)}) - Cày {lpd} màn: Nhận Rương {', '.join(daily_chests)}")
+            
+    logs.insert(1, f"**Sau {days} ngày, tích lũy được:** {chests[1]} Rương 1-Sao, {chests[2]} Rương 2-Sao, {chests[3]} Rương 3-Sao.")
+    return {"chests": chests, "logs": logs}

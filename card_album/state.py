@@ -58,18 +58,42 @@ def ensure_album_state(session_state) -> None:
         session_state["new_cards_drawn"] = 0
     if "dup_cards_drawn" not in session_state:
         session_state["dup_cards_drawn"] = 0
+    if "pack_stars_gained" not in session_state:
+        session_state["pack_stars_gained"] = 0
     if "new_cards_by_rarity" not in session_state:
         session_state["new_cards_by_rarity"] = {r: 0 for r in range(1, 7)}
     if "dup_cards_by_rarity" not in session_state:
         session_state["dup_cards_by_rarity"] = {r: 0 for r in range(1, 7)}
+    
+    # Chest Drop Specific Counters
+    if "cd_total_cards_drawn" not in session_state:
+        session_state["cd_total_cards_drawn"] = 0
+    if "cd_new_cards_drawn" not in session_state:
+        session_state["cd_new_cards_drawn"] = 0
+    if "cd_dup_cards_drawn" not in session_state:
+        session_state["cd_dup_cards_drawn"] = 0
+    if "cd_stars_gained" not in session_state:
+        session_state["cd_stars_gained"] = 0
+    if "cd_new_cards_by_rarity" not in session_state:
+        session_state["cd_new_cards_by_rarity"] = {r: 0 for r in range(1, 7)}
+    if "cd_dup_cards_by_rarity" not in session_state:
+        session_state["cd_dup_cards_by_rarity"] = {r: 0 for r in range(1, 7)}
+    if "chest_drop_counts" not in session_state:
+        session_state["chest_drop_counts"] = {r: 0 for r in range(1, 6)}
+    if "cd_active_session" not in session_state:
+        session_state["cd_active_session"] = None
+    if "cd_history" not in session_state:
+        session_state["cd_history"] = []
 
 
 def reset_progress(session_state) -> None:
     keys_to_clear = [
         "inventory", "stars", "total_packs", "pack_counts", 
         "pack_pity", "log", "grand_album_completions", "grand_album_finished",
-        "owned_cards", "total_cards_drawn", "new_cards_drawn", "dup_cards_drawn",
-        "new_cards_by_rarity", "dup_cards_by_rarity"
+        "owned_cards", "total_cards_drawn", "new_cards_drawn", "dup_cards_drawn", "pack_stars_gained",
+        "new_cards_by_rarity", "dup_cards_by_rarity",
+        "cd_total_cards_drawn", "cd_new_cards_drawn", "cd_dup_cards_drawn", "cd_stars_gained",
+        "cd_new_cards_by_rarity", "cd_dup_cards_by_rarity", "chest_drop_counts"
     ]
     for k in keys_to_clear:
         session_state.pop(k, None)
@@ -78,3 +102,19 @@ def reset_progress(session_state) -> None:
 
 def total_cards_collected(session_state) -> int:
     return sum(session_state["inventory"].values())
+
+def log_chest_drop(session_state, action_type: str, chests_opened: int, start_tier: int, new_cards: int, dup_cards: int, upgrade_summary: dict = None) -> None:
+    import datetime
+    if "cd_history" not in session_state:
+        session_state["cd_history"] = []
+    
+    entry = {
+        "time": datetime.datetime.now().strftime("%H:%M:%S"),
+        "type": action_type,
+        "start_tier": start_tier,
+        "chests": chests_opened,
+        "new": new_cards,
+        "dup": dup_cards,
+        "upgrades": upgrade_summary or {}
+    }
+    session_state["cd_history"].insert(0, entry)

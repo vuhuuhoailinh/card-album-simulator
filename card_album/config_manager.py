@@ -25,8 +25,19 @@ def get_default_config() -> dict:
                 "weights": {str(k): v for k, v in p.weights.items()},
             }
 
+    from .config import CHEST_DROP_TIERS
+    chest_tiers_dict = {}
+    for tier, cfg in CHEST_DROP_TIERS.items():
+        chest_tiers_dict[str(tier)] = {
+            "name": cfg.name,
+            "upgrade_chance": cfg.upgrade_chance,
+            "y_value": cfg.y_value,
+            "weights": {str(k): v for k, v in cfg.weights.items()},
+        }
+
     return {
         "packs": packs_dict,
+        "chest_tiers": chest_tiers_dict,
         "rewards": {
             "master_pass_free": copy.deepcopy(MASTER_PASS_FREE),
             "master_pass_premium": copy.deepcopy(MASTER_PASS_PREMIUM),
@@ -35,7 +46,8 @@ def get_default_config() -> dict:
         },
         "system": {
             "new_card_power": 3.0,
-            "new_card_formula_type": "document"
+            "new_card_formula_type": "document",
+            "chest_drop_x": 2.0
         }
     }
 
@@ -47,6 +59,9 @@ def load_config_to_state(session_state, config_dict=None) -> None:
 
     # Load packs
     session_state["config_packs"] = config_dict["packs"]
+
+    # Load chest tiers
+    session_state["config_chest_drop_tiers"] = config_dict.get("chest_tiers", get_default_config()["chest_tiers"])
 
     # Load rewards (convert keys back to int if they were strings from JSON)
     rewards = config_dict["rewards"]
@@ -60,16 +75,19 @@ def load_config_to_state(session_state, config_dict=None) -> None:
     if "system" in config_dict:
         session_state["new_card_power"] = config_dict["system"].get("new_card_power", 3.0)
         session_state["new_card_formula_type"] = config_dict["system"].get("new_card_formula_type", "simple")
+        session_state["config_chest_drop_x"] = config_dict["system"].get("chest_drop_x", 2.0)
 
 
 def export_config_to_json(session_state) -> str:
     """Exports current session state config to JSON string."""
     config_dict = {
         "packs": session_state["config_packs"],
+        "chest_tiers": session_state.get("config_chest_drop_tiers", get_default_config()["chest_tiers"]),
         "rewards": session_state["config_rewards"],
         "system": {
             "new_card_power": session_state.get("new_card_power", 3.0),
-            "new_card_formula_type": session_state.get("new_card_formula_type", "simple")
+            "new_card_formula_type": session_state.get("new_card_formula_type", "simple"),
+            "chest_drop_x": session_state.get("config_chest_drop_x", 2.0)
         }
     }
     return json.dumps(config_dict, indent=4, ensure_ascii=False)

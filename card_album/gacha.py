@@ -120,6 +120,7 @@ def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str) -> 
         return "NEW", rarity, c
 
     session_state["stars"] += STAR_VALUES[rarity]
+    session_state["pack_stars_gained"] = session_state.get("pack_stars_gained", 0) + STAR_VALUES[rarity]
     session_state["dup_cards_drawn"] += 1
     session_state["dup_cards_by_rarity"][rarity] += 1
     c = pick_dup_card(session_state, rarity)
@@ -216,6 +217,7 @@ def open_rainbow_pack_guaranteed(session_state) -> tuple[str, int, tuple]:
         return "NEW", rarity, c
 
     session_state["stars"] += STAR_VALUES[6]
+    session_state["pack_stars_gained"] = session_state.get("pack_stars_gained", 0) + STAR_VALUES[6]
     session_state["dup_cards_drawn"] += 1
     session_state["dup_cards_by_rarity"][6] += 1
     c = pick_dup_card(session_state, 6)
@@ -303,6 +305,26 @@ def open_chest(session_state, chest_type: str) -> dict:
         "new_cards_list": new_cards_list,
         "dup_cards_list": dup_cards_list
     }
+
+
+def run_auto_chests(session_state) -> dict:
+    chests_opened = 0
+    breakdown = {"Gold": 0, "Silver": 0, "Bronze": 0}
+    max_auto_chests = 1000
+    while session_state["stars"] >= 100 and chests_opened < max_auto_chests:
+        if session_state["stars"] >= 500:
+            open_chest(session_state, "Gold")
+            chests_opened += 1
+            breakdown["Gold"] += 1
+        elif session_state["stars"] >= 250:
+            open_chest(session_state, "Silver")
+            chests_opened += 1
+            breakdown["Silver"] += 1
+        elif session_state["stars"] >= 100:
+            open_chest(session_state, "Bronze")
+            chests_opened += 1
+            breakdown["Bronze"] += 1
+    return breakdown
 
 def open_bulk_packs(session_state, bulk_settings: dict[str, int], auto_chest: bool = False) -> dict:
     total_to_open = sum(bulk_settings.values())
@@ -413,3 +435,71 @@ def build_rate_rows(session_state, pack_type: str) -> list[dict]:
         )
 
     return rows
+
+
+# --- CHEST DROP (WIN STREAK MINI-GAME) LOGIC ---
+def calculate_chest_drop_new_chance(session_state, rarity: int, y_val: float) -> float:
+    cards_owned = session_state['inventory'][rarity]
+    max_cards = MAX_CARDS[rarity]
+    if cards_owned >= max_cards:
+        return 0.0
+    base_new = (max_cards - cards_owned) / max_cards
+    x_val = float(session_state.get('config_chest_drop_x', 2.0))
+    final_power = x_val + y_val
+    return min(1.0, base_new ** final_power)
+
+def roll_chest_drop_card(session_state, rarity: int, y_val: float) -> tuple[str, tuple]:
+    session_state['cd_total_cards_drawn'] += 1
+    new_chance = calculate_chest_drop_new_chance(session_state, rarity, y_val)
+    if random.random() < new_chance:
+        session_state['inventory'][rarity] += 1
+        c = pick_new_card(session_state, rarity)
+        session_state['cd_new_cards_drawn'] += 1
+        session_state['cd_new_cards_by_rarity'][rarity] += 1
+        check_grand_album(session_state)
+        if 'recent_draws' in session_state: session_state['recent_draws'].append(('NEW', rarity, c))
+        return 'NEW', c
+    session_state['stars'] += STAR_VALUES[rarity]
+    session_state['cd_stars_gained'] += STAR_VALUES[rarity]
+    session_state['cd_dup_cards_drawn'] += 1
+    session_state['cd_dup_cards_by_rarity'][rarity] += 1
+    c = pick_dup_card(session_state, rarity)
+    if 'recent_draws' in session_state: session_state['recent_draws'].append(('DUP', rarity, c))
+    return 'DUP', c
+
+def process_chest_drop_hit(session_state, current_tier: int) -> dict:
+    session_state["chest_drop_counts"][current_tier] += 1
+    tiers_config = session_state.get('config_chest_drop_tiers')
+    if not tiers_config:
+        from .config_manager import get_default_config
+        tiers_config = get_default_config()["chest_tiers"]
+        
+    t_cfg = tiers_config[str(current_tier)]
+    weights = t_cfg["weights"]
+    
+    total_weight = sum(int(v) for v in weights.values())
+    r = random.uniform(0, total_weight)
+    current_weight = 0
+    drop_rarity = current_tier
+    for rarity_str, weight in weights.items():
+        current_weight += int(weight)
+        if r <= current_weight:
+            drop_rarity = int(rarity_str)
+            break
+            
+    status, card_tuple = roll_chest_drop_card(session_state, drop_rarity, float(t_cfg["y_value"]))
+    
+    upgraded = False
+    next_tier = current_tier
+    if current_tier < 5:
+        if random.random() < float(t_cfg["upgrade_chance"]):
+            upgraded = True
+            next_tier = current_tier + 1
+            
+    return {
+        'status': status,
+        'rarity': drop_rarity,
+        'card': card_tuple,
+        'upgraded': upgraded,
+        'next_tier': next_tier
+    }

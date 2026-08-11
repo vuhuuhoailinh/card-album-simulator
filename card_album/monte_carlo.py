@@ -12,14 +12,29 @@ def render_monte_carlo_tab():
     st.markdown("Chạy mô phỏng mở **Giỏ Hàng (Cart)** hàng ngàn lần để tính xác suất hoàn thành Album và sự phân bổ của Thẻ/Sao dư thừa.")
     
     # Check if cart is empty
-    cart = st.session_state.get("cart_packs", {})
-    total_cart_packs = sum(cart.values())
+    cart_packs = st.session_state.get("cart_packs", {})
+    cart_chests = {
+        1: st.session_state.get("bulk_chest_1", 0),
+        2: st.session_state.get("bulk_chest_2", 0),
+        3: st.session_state.get("bulk_chest_3", 0)
+    }
     
-    if total_cart_packs == 0:
-        st.warning("Giỏ hàng của bạn đang trống! Hãy sang tab **LiveOps Economy** để cày sự kiện và lưu thẻ vào giỏ, hoặc qua tab **Mở Gói (Gacha)** để tự nhập số lượng thủ công vào Giỏ Hàng.")
+    total_cart_packs = sum(cart_packs.values())
+    total_cart_chests = sum(cart_chests.values())
+    
+    if total_cart_packs == 0 and total_cart_chests == 0:
+        st.warning("Giỏ hàng của bạn đang trống! Hãy sang tab **LiveOps Economy**, **Mở Gói (Gacha)**, hoặc **Chest Drop** để thêm thẻ/rương vào giỏ.")
         return
         
-    st.info(f"🛒 **Giỏ Hàng hiện tại:** {', '.join([f'{v} {k}' for k, v in cart.items() if v > 0])}")
+    cart_pack_str = ', '.join([f'{v} {k}' for k, v in cart_packs.items() if v > 0])
+    cart_chest_str = ', '.join([f'{v} Rương {k}-Sao' for k, v in cart_chests.items() if v > 0])
+    
+    if cart_pack_str and cart_chest_str:
+        st.info(f"**Giỏ Hàng Pack:** {cart_pack_str}\n | 🛒 **Giỏ Hàng Chest:** {cart_chest_str}", icon="🛒")
+    elif cart_pack_str:
+        st.info(f"**Giỏ Hàng Pack:** {cart_pack_str}", icon="🛒")
+    else:
+        st.info(f"**Giỏ Hàng Chest:** {cart_chest_str}", icon="🛒")
     
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -29,19 +44,21 @@ def render_monte_carlo_tab():
         start_btn = st.button("🚀 BẮT ĐẦU MÔ PHỎNG", type="primary", use_container_width=True)
         
     if start_btn:
-        with st.spinner(f"Đang giả lập {iterations} lần bóc {total_cart_packs} pack..."):
-            results = run_monte_carlo(st.session_state, cart, iterations, simulate_from_scratch, auto_chest)
+        with st.spinner(f"Đang giả lập {iterations} lần bóc..."):
+            results = run_monte_carlo(st.session_state, cart_packs, cart_chests, iterations, simulate_from_scratch, auto_chest)
             st.session_state["mc_results"] = results
             
     if "mc_results" in st.session_state:
         res = st.session_state["mc_results"]
-        render_monte_carlo_results(res, iterations, total_cart_packs)
+        render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_chests)
 
 
-def run_monte_carlo(base_state, cart, iterations, simulate_from_scratch=True, auto_chest=False):
+def run_monte_carlo(base_state, cart_packs, cart_chests, iterations, simulate_from_scratch=True, auto_chest=False):
     cards_collected = []
     stars_collected = []
     grand_album_count = []
+    total_dups = []
+    total_stars_earned = []
     
     for _ in range(iterations):
         # Create an isolated dummy state
@@ -66,25 +83,53 @@ def run_monte_carlo(base_state, cart, iterations, simulate_from_scratch=True, au
             "dup_cards_drawn": 0 if simulate_from_scratch else base_state.get("dup_cards_drawn", 0),
             "new_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("new_cards_by_rarity", {r: 0 for r in range(1, 7)})),
             "dup_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("dup_cards_by_rarity", {r: 0 for r in range(1, 7)})),
+            "pack_stars_gained": 0 if simulate_from_scratch else base_state.get("pack_stars_gained", 0),
+            "cd_total_cards_drawn": 0 if simulate_from_scratch else base_state.get("cd_total_cards_drawn", 0),
+            "cd_new_cards_drawn": 0 if simulate_from_scratch else base_state.get("cd_new_cards_drawn", 0),
+            "cd_dup_cards_drawn": 0 if simulate_from_scratch else base_state.get("cd_dup_cards_drawn", 0),
+            "cd_stars_gained": 0 if simulate_from_scratch else base_state.get("cd_stars_gained", 0),
+            "chest_drop_counts": {r: 0 for r in range(1, 6)} if simulate_from_scratch else copy.deepcopy(base_state.get("chest_drop_counts", {r: 0 for r in range(1, 6)})),
+            "config_chest_drop_tiers": base_state.get("config_chest_drop_tiers", {}),
+            "config_chest_drop_x": base_state.get("config_chest_drop_x", 2.0),
+            "cd_new_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("cd_new_cards_by_rarity", {r: 0 for r in range(1, 7)})),
+            "cd_dup_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("cd_dup_cards_by_rarity", {r: 0 for r in range(1, 7)})),
         }
         
-        # Run the bulk open
-        open_bulk_packs(sim_state, cart, auto_chest=auto_chest)
+        # Run the bulk open packs (without auto_chest yet)
+        open_bulk_packs(sim_state, cart_packs, auto_chest=False)
         
+        # Run the bulk open chests
+        from .gacha import process_chest_drop_hit
+        for start_tier, count in cart_chests.items():
+            for _ in range(count):
+                current_t = start_tier
+                for _ in range(5):
+                    res = process_chest_drop_hit(sim_state, current_t)
+                    current_t = res["next_tier"]
+                    
+        # NOW run auto chest with combined stars
+        if auto_chest:
+            from .gacha import run_auto_chests
+            run_auto_chests(sim_state)
+            
         # Record results
         total_cards = sim_state["grand_album_completions"] * TOTAL_CARDS + sum(sim_state["inventory"].values())
         cards_collected.append(total_cards)
         stars_collected.append(sim_state["stars"])
         grand_album_count.append(sim_state["grand_album_completions"])
+        total_dups.append(sim_state.get("dup_cards_drawn", 0) + sim_state.get("cd_dup_cards_drawn", 0))
+        total_stars_earned.append(sim_state.get("pack_stars_gained", 0) + sim_state.get("cd_stars_gained", 0))
         
     return {
         "cards": cards_collected,
         "stars": stars_collected,
-        "grand_albums": grand_album_count
+        "grand_albums": grand_album_count,
+        "total_dups": total_dups,
+        "total_stars_earned": total_stars_earned
     }
 
 
-def render_monte_carlo_results(res, iterations, total_cart_packs):
+def render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_chests):
     st.divider()
     st.subheader(f"📈 Kết quả sau {iterations} lần chạy")
     
@@ -104,12 +149,22 @@ def render_monte_carlo_results(res, iterations, total_cart_packs):
     completions = df[df["grand_albums"] > start_completions]
     completion_rate = len(completions) / iterations * 100
     
+    avg_dups = df.get("total_dups", pd.Series([0])).mean()
+    avg_stars_earned = df.get("total_stars_earned", pd.Series([0])).mean()
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Hoàn thành Album", f"{completion_rate:.1f}%")
-    c2.metric("Trung bình Thẻ", f"{avg_cards:.1f}")
-    c3.metric("Max Thẻ (Hên)", f"{max_cards}")
-    c4.metric("Min Thẻ (Xui)", f"{min_cards}")
-    c5.metric("Trung bình Sao", f"{avg_stars:.0f} ⭐")
+    c2.metric("Trung bình Thẻ (Tổng)", f"{avg_cards:.1f}")
+    c3.metric("Thẻ Trùng (Dups)", f"{avg_dups:.1f}")
+    c4.metric("Max Thẻ (Hên)", f"{max_cards}")
+    c5.metric("Min Thẻ (Xui)", f"{min_cards}")
+    
+    st.write("")
+    c6, c7, c8, c9, c10 = st.columns(5)
+    c6.metric("Trung bình Sao nhận được", f"{avg_stars_earned:.0f} ⭐")
+    c7.metric("Sao Còn Lại (Dư thừa)", f"{avg_stars:.0f} ⭐")
+    c8.empty()
+    c9.empty()
+    c10.empty()
     
     # Charts
     st.info("💡 **Lưu ý:** Để biểu đồ hiển thị chuẩn xác và không bị gãy đoạn do cơ chế Reset của Grand Album, **Số Thẻ Cuối Cùng** sẽ được cộng dồn liên tục nếu bạn vượt quá 135 thẻ. (VD: Nếu bạn full album bị reset về 0, rồi bóc thêm được 10 thẻ nữa, hệ thống sẽ ghi nhận bạn có 145 thẻ).")

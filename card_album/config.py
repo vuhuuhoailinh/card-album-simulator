@@ -80,3 +80,20 @@ PACK_ICONS = {
     "Gold": "🟨",
     "Rainbow": "🌈",
 }
+
+
+# Configuration for the new Chest Drop (Win Streak) mini-game
+@dataclass(frozen=True)
+class ChestTierConfig:
+    name: str
+    upgrade_chance: float
+    y_value: float
+    weights: dict[int, int]
+
+CHEST_DROP_TIERS = {
+    1: ChestTierConfig("1-Sao", 0.35, 1.0, {1: 100, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}),
+    2: ChestTierConfig("2-Sao", 0.35, 0.5, {1: 0, 2: 100, 3: 0, 4: 0, 5: 0, 6: 0}),
+    3: ChestTierConfig("3-Sao", 0.20, 0.0, {1: 0, 2: 0, 3: 100, 4: 0, 5: 0, 6: 0}),
+    4: ChestTierConfig("4-Sao", 0.15, -0.5, {1: 0, 2: 0, 3: 0, 4: 100, 5: 0, 6: 0}),
+    5: ChestTierConfig("5-Sao", 0.0, -1.0, {1: 0, 2: 0, 3: 0, 4: 0, 5: 60, 6: 40})
+}
