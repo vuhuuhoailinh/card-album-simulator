@@ -103,8 +103,9 @@ def run_monte_carlo(base_state, cart_packs, cart_chests, iterations, simulate_fr
         for start_tier, count in cart_chests.items():
             for _ in range(count):
                 current_t = start_tier
+                drawn_in_batch = set()
                 for _ in range(5):
-                    res = process_chest_drop_hit(sim_state, current_t)
+                    res = process_chest_drop_hit(sim_state, start_tier, current_t, drawn_in_batch)
                     current_t = res["next_tier"]
                     
         # NOW run auto chest with combined stars

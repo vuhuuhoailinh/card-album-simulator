@@ -25,19 +25,23 @@ def get_default_config() -> dict:
                 "weights": {str(k): v for k, v in p.weights.items()},
             }
 
-    from .config import CHEST_DROP_TIERS
+    from .config import CHEST_DROP_TIERS, CHEST_UPGRADE_MATRIX
     chest_tiers_dict = {}
     for tier, cfg in CHEST_DROP_TIERS.items():
         chest_tiers_dict[str(tier)] = {
             "name": cfg.name,
-            "upgrade_chance": cfg.upgrade_chance,
             "y_value": cfg.y_value,
             "weights": {str(k): v for k, v in cfg.weights.items()},
         }
+        
+    chest_upgrade_matrix = {}
+    for stier, cfg in CHEST_UPGRADE_MATRIX.items():
+        chest_upgrade_matrix[str(stier)] = {str(k): v for k, v in cfg.items()}
 
     return {
         "packs": packs_dict,
         "chest_tiers": chest_tiers_dict,
+        "chest_upgrade_matrix": chest_upgrade_matrix,
         "rewards": {
             "master_pass_free": copy.deepcopy(MASTER_PASS_FREE),
             "master_pass_premium": copy.deepcopy(MASTER_PASS_PREMIUM),
@@ -62,6 +66,9 @@ def load_config_to_state(session_state, config_dict=None) -> None:
 
     # Load chest tiers
     session_state["config_chest_drop_tiers"] = config_dict.get("chest_tiers", get_default_config()["chest_tiers"])
+    
+    # Load chest upgrade matrix
+    session_state["config_chest_upgrade_matrix"] = config_dict.get("chest_upgrade_matrix", get_default_config()["chest_upgrade_matrix"])
 
     # Load rewards (convert keys back to int if they were strings from JSON)
     rewards = config_dict["rewards"]
@@ -83,6 +90,7 @@ def export_config_to_json(session_state) -> str:
     config_dict = {
         "packs": session_state["config_packs"],
         "chest_tiers": session_state.get("config_chest_drop_tiers", get_default_config()["chest_tiers"]),
+        "chest_upgrade_matrix": session_state.get("config_chest_upgrade_matrix", get_default_config()["chest_upgrade_matrix"]),
         "rewards": session_state["config_rewards"],
         "system": {
             "new_card_power": session_state.get("new_card_power", 3.0),

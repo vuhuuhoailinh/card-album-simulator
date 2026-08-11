@@ -68,7 +68,7 @@ def calculate_new_chance(session_state, rarity: int, pack_type: str) -> float:
     return min(1.0, base_new ** final_power)
 
 
-def pick_new_card(session_state, rarity: int):
+def pick_new_card(session_state, rarity: int, drawn_in_batch: set = None):
     possible_cards = []
     from .config import CARD_SETS
     for set_id, set_info in CARD_SETS.items():
@@ -77,29 +77,43 @@ def pick_new_card(session_state, rarity: int):
             for idx in range(count):
                 possible_cards.append((set_id, rarity, idx))
                 
-    missing_cards = [c for c in possible_cards if c not in session_state["owned_cards"]]
+    if drawn_in_batch is None:
+        drawn_in_batch = set()
+        
+    missing_cards = [c for c in possible_cards if c not in session_state["owned_cards"] and c not in drawn_in_batch]
     import random
     if missing_cards:
         chosen_card = random.choice(missing_cards)
         session_state["owned_cards"].add(chosen_card)
+        drawn_in_batch.add(chosen_card)
         return chosen_card
     return None
 
-def pick_dup_card(session_state, rarity: int):
-    owned = [c for c in session_state["owned_cards"] if c[1] == rarity]
+def pick_dup_card(session_state, rarity: int, drawn_in_batch: set = None):
+    if drawn_in_batch is None:
+        drawn_in_batch = set()
+        
+    owned = [c for c in session_state["owned_cards"] if c[1] == rarity and c not in drawn_in_batch]
     import random
     if owned:
-        return random.choice(owned)
+        chosen = random.choice(owned)
+        drawn_in_batch.add(chosen)
+        return chosen
     possible_cards = []
     from .config import CARD_SETS
     for set_id, set_info in CARD_SETS.items():
         if rarity in set_info["cards"]:
             count = set_info["cards"][rarity]
             for idx in range(count):
-                possible_cards.append((set_id, rarity, idx))
-    return random.choice(possible_cards) if possible_cards else None
+                if (set_id, rarity, idx) not in drawn_in_batch:
+                    possible_cards.append((set_id, rarity, idx))
+    if possible_cards:
+        chosen = random.choice(possible_cards)
+        drawn_in_batch.add(chosen)
+        return chosen
+    return None
 
-def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str) -> tuple[str, int, tuple]:
+def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str, drawn_in_batch: set = None) -> tuple[str, int, tuple]:
     session_state["total_cards_drawn"] += 1
     cards_owned = session_state["inventory"][rarity]
     max_cards = MAX_CARDS[rarity]
@@ -112,7 +126,7 @@ def roll_card(session_state, rarity: int, pity_bonus: float, pack_type: str) -> 
 
     if random.random() < final_chance:
         session_state["inventory"][rarity] += 1
-        c = pick_new_card(session_state, rarity)
+        c = pick_new_card(session_state, rarity, drawn_in_batch)
         session_state["new_cards_drawn"] += 1
         session_state["new_cards_by_rarity"][rarity] += 1
         check_grand_album(session_state)
@@ -139,14 +153,16 @@ def open_pack(session_state, pack_type: str) -> None:
     got_new = False
     raw_results = []
     current_pity_bonus = pity_bonus
+    
+    drawn_in_batch = set()
 
     for _ in range(effective_size - 1):
         rarity_str = random.choices(
             list(pack_config["weights"].keys()),
             weights=list(pack_config["weights"].values()),
         )[0]
-        rarity = int(rarity_str)
-        status, final_rarity, specific_card = roll_card(session_state, rarity, current_pity_bonus, pack_type)
+        rarity_rolled = int(rarity_str)
+        status, final_rarity, specific_card = roll_card(session_state, rarity_rolled, current_pity_bonus, pack_type, drawn_in_batch)
         if status == "NEW":
             got_new = True
             if session_state.get("total_packs", 0) > 5:
@@ -155,7 +171,7 @@ def open_pack(session_state, pack_type: str) -> None:
 
     is_rainbow = (pack_type == "Rainbow")
     if is_rainbow:
-        wild_status, wild_rarity, wild_specific_card = open_rainbow_pack_guaranteed(session_state)
+        wild_status, wild_rarity, wild_specific_card = open_rainbow_pack_guaranteed(session_state, drawn_in_batch)
         if wild_status == "NEW":
             got_new = True
             current_pity_bonus = 0.0
@@ -163,7 +179,7 @@ def open_pack(session_state, pack_type: str) -> None:
     else:
         guaranteed_tier = pack_config["guaranteed_tier"]
         guaranteed_rarity = guaranteed_tier
-        status, final_rarity, specific_card = roll_card(session_state, guaranteed_rarity, current_pity_bonus, pack_type)
+        status, final_rarity, specific_card = roll_card(session_state, guaranteed_rarity, current_pity_bonus, pack_type, drawn_in_batch)
         if status == "NEW":
             got_new = True
             current_pity_bonus = 0.0
@@ -194,11 +210,11 @@ def open_pack(session_state, pack_type: str) -> None:
     add_log(session_state, format_pack_log(session_state, pack_type, pack_results, pity_message, got_new))
 
 
-def open_rainbow_pack_guaranteed(session_state) -> tuple[str, int, tuple]:
+def open_rainbow_pack_guaranteed(session_state, drawn_in_batch: set = None) -> tuple[str, int, tuple]:
     session_state["total_cards_drawn"] += 1
     if session_state["inventory"][6] < MAX_CARDS[6]:
         session_state["inventory"][6] += 1
-        c = pick_new_card(session_state, 6)
+        c = pick_new_card(session_state, 6, drawn_in_batch)
         session_state["new_cards_drawn"] += 1
         session_state["new_cards_by_rarity"][6] += 1
         check_grand_album(session_state)
@@ -209,7 +225,7 @@ def open_rainbow_pack_guaranteed(session_state) -> tuple[str, int, tuple]:
     if missing_rarities:
         rarity = random.choice(missing_rarities)
         session_state["inventory"][rarity] += 1
-        c = pick_new_card(session_state, rarity)
+        c = pick_new_card(session_state, rarity, drawn_in_batch)
         session_state["new_cards_drawn"] += 1
         session_state["new_cards_by_rarity"][rarity] += 1
         check_grand_album(session_state)
@@ -220,7 +236,7 @@ def open_rainbow_pack_guaranteed(session_state) -> tuple[str, int, tuple]:
     session_state["pack_stars_gained"] = session_state.get("pack_stars_gained", 0) + STAR_VALUES[6]
     session_state["dup_cards_drawn"] += 1
     session_state["dup_cards_by_rarity"][6] += 1
-    c = pick_dup_card(session_state, 6)
+    c = pick_dup_card(session_state, 6, drawn_in_batch)
     if "recent_draws" in session_state: session_state["recent_draws"].append(("DUP", 6, c))
     return "DUP", 6, c
 
@@ -448,12 +464,12 @@ def calculate_chest_drop_new_chance(session_state, rarity: int, y_val: float) ->
     final_power = x_val + y_val
     return min(1.0, base_new ** final_power)
 
-def roll_chest_drop_card(session_state, rarity: int, y_val: float) -> tuple[str, tuple]:
+def roll_chest_drop_card(session_state, rarity: int, y_val: float, drawn_in_batch: set = None) -> tuple[str, tuple]:
     session_state['cd_total_cards_drawn'] += 1
     new_chance = calculate_chest_drop_new_chance(session_state, rarity, y_val)
     if random.random() < new_chance:
         session_state['inventory'][rarity] += 1
-        c = pick_new_card(session_state, rarity)
+        c = pick_new_card(session_state, rarity, drawn_in_batch)
         session_state['cd_new_cards_drawn'] += 1
         session_state['cd_new_cards_by_rarity'][rarity] += 1
         check_grand_album(session_state)
@@ -463,16 +479,19 @@ def roll_chest_drop_card(session_state, rarity: int, y_val: float) -> tuple[str,
     session_state['cd_stars_gained'] += STAR_VALUES[rarity]
     session_state['cd_dup_cards_drawn'] += 1
     session_state['cd_dup_cards_by_rarity'][rarity] += 1
-    c = pick_dup_card(session_state, rarity)
+    c = pick_dup_card(session_state, rarity, drawn_in_batch)
     if 'recent_draws' in session_state: session_state['recent_draws'].append(('DUP', rarity, c))
     return 'DUP', c
 
-def process_chest_drop_hit(session_state, current_tier: int) -> dict:
+def process_chest_drop_hit(session_state, start_tier: int, current_tier: int, drawn_in_batch: set = None) -> dict:
     session_state["chest_drop_counts"][current_tier] += 1
     tiers_config = session_state.get('config_chest_drop_tiers')
-    if not tiers_config:
+    matrix_config = session_state.get('config_chest_upgrade_matrix')
+    if not tiers_config or not matrix_config:
         from .config_manager import get_default_config
-        tiers_config = get_default_config()["chest_tiers"]
+        def_cfg = get_default_config()
+        tiers_config = def_cfg["chest_tiers"]
+        matrix_config = def_cfg["chest_upgrade_matrix"]
         
     t_cfg = tiers_config[str(current_tier)]
     weights = t_cfg["weights"]
@@ -487,12 +506,14 @@ def process_chest_drop_hit(session_state, current_tier: int) -> dict:
             drop_rarity = int(rarity_str)
             break
             
-    status, card_tuple = roll_chest_drop_card(session_state, drop_rarity, float(t_cfg["y_value"]))
+    # We will implement the drawn_in_batch logic in Phase 2
+    status, card_tuple = roll_chest_drop_card(session_state, drop_rarity, float(t_cfg["y_value"]), drawn_in_batch)
     
     upgraded = False
     next_tier = current_tier
     if current_tier < 5:
-        if random.random() < float(t_cfg["upgrade_chance"]):
+        upgrade_chance = float(matrix_config[str(start_tier)][str(current_tier)])
+        if random.random() < upgrade_chance:
             upgraded = True
             next_tier = current_tier + 1
             

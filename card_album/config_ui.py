@@ -18,15 +18,17 @@ def init_draft_config():
         st.session_state["draft_chest_drop_x"] = st.session_state.get("config_chest_drop_x", 2.0)
     if "draft_config_chest_drop_tiers" not in st.session_state:
         st.session_state["draft_config_chest_drop_tiers"] = copy.deepcopy(st.session_state.get("config_chest_drop_tiers", {}))
+    if "draft_config_chest_upgrade_matrix" not in st.session_state:
+        st.session_state["draft_config_chest_upgrade_matrix"] = copy.deepcopy(st.session_state.get("config_chest_upgrade_matrix", {}))
 
 def clear_draft_config():
     keys_to_clear = [
         "draft_config_packs", "draft_config_rewards", 
         "draft_new_card_formula_type", "draft_new_card_power",
-        "draft_chest_drop_x", "draft_config_chest_drop_tiers",
-        "pack_config_editor", "reward_editor_master_pass_free",
-        "reward_editor_win_streak_rewards", "reward_editor_master_pass_premium",
-        "reward_editor_key_collection_rewards", "chest_drop_tiers_editor"
+        "draft_chest_drop_x", "draft_config_chest_drop_tiers", "draft_config_chest_upgrade_matrix",
+        "draft_config_packs", "draft_config_rewards",
+        "reward_editor_master_pass_free", "reward_editor_master_pass_premium", "reward_editor_win_streak_rewards",
+        "reward_editor_key_collection_rewards", "chest_drop_tiers_editor", "chest_upgrade_matrix_editor"
     ]
     for key in keys_to_clear:
         st.session_state.pop(key, None)
@@ -139,7 +141,6 @@ def render_config_tab():
         t_cfg = draft_tiers[tier_str]
         row = {
             "Cấp Rương": t_cfg["name"],
-            "Upgrade": t_cfg["upgrade_chance"],
             "y_value": t_cfg["y_value"],
         }
         for i in range(1, 7):
@@ -151,7 +152,6 @@ def render_config_tab():
     
     chest_col_config = {
         "Cấp Rương": st.column_config.TextColumn("Cấp Rương", disabled=True),
-        "Upgrade": st.column_config.NumberColumn("Upgrade", min_value=0.0, max_value=1.0, step=0.01, help="Tỉ lệ thăng cấp lên rương tiếp theo (Ví dụ 0.35 = 35%)"),
         "y_value": st.column_config.NumberColumn("y_value", help="Hệ số độ khó (y) khi đập rương này."),
     }
     for i in range(1, 7):
@@ -167,6 +167,31 @@ def render_config_tab():
         column_config=chest_col_config
     )
     
+    st.markdown("**Bảng Tỉ Lệ Thăng Cấp Rương:**")
+    st.caption("Cấu hình tỉ lệ thăng cấp phụ thuộc vào rương khởi đầu. Dòng là rương khởi đầu, Cột là rương hiện tại.")
+    
+    matrix_data = []
+    draft_matrix = st.session_state["draft_config_chest_upgrade_matrix"]
+    for stier in range(1, 6):
+        row = {"Rương Khởi Đầu": f"{stier}-Sao"}
+        for ctier in range(1, 5):
+            row[f"Lên {ctier+1}-Sao"] = float(draft_matrix[str(stier)].get(str(ctier), 0.0))
+        matrix_data.append(row)
+        
+    df_matrix = pd.DataFrame(matrix_data)
+    matrix_col_config = {"Rương Khởi Đầu": st.column_config.TextColumn("Rương Khởi Đầu", disabled=True)}
+    for ctier in range(1, 5):
+        col_name = f"Lên {ctier+1}-Sao"
+        matrix_col_config[col_name] = st.column_config.NumberColumn(col_name, min_value=0.0, max_value=1.0, step=0.01)
+
+    edited_matrix = st.data_editor(
+        df_matrix,
+        hide_index=True,
+        use_container_width=True,
+        key="chest_upgrade_matrix_editor",
+        column_config=matrix_col_config
+    )
+
     st.divider()
     
     # ----------------- PACKS CONFIG -----------------
@@ -246,12 +271,21 @@ def render_config_tab():
         for idx, row in edited_chest_tiers.iterrows():
             tier_str = str(idx + 1)
             t = st.session_state["draft_config_chest_drop_tiers"][tier_str]
-            t["upgrade_chance"] = float(row["Upgrade"])
             t["y_value"] = float(row["y_value"])
             for i in range(1, 7):
                 col_name = f"Star_{i}" if i < 6 else "Gold"
                 t["weights"][str(i)] = int(row[col_name])
         st.session_state["config_chest_drop_tiers"] = copy.deepcopy(st.session_state["draft_config_chest_drop_tiers"])
+        
+        # Apply Chest Upgrade Matrix
+        for idx, row in edited_matrix.iterrows():
+            stier_str = str(idx + 1)
+            for ctier in range(1, 5):
+                col_name = f"Lên {ctier+1}-Sao"
+                st.session_state["draft_config_chest_upgrade_matrix"][stier_str][str(ctier)] = float(row[col_name])
+            # Set ctier=5 to 0.0 implicitly since there is no UI for it
+            st.session_state["draft_config_chest_upgrade_matrix"][stier_str]["5"] = 0.0
+        st.session_state["config_chest_upgrade_matrix"] = copy.deepcopy(st.session_state["draft_config_chest_upgrade_matrix"])
         
         # Apply Packs Config
         for idx, row in edited_packs.iterrows():
