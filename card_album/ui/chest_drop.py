@@ -101,7 +101,7 @@ def render_chest_drop_tab() -> None:
     
     with st.container(border=True):
         st.subheader("📊 Tổng Quan Chest Drop")
-        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+        col_stats1, col_stats2, col_stats3, col_stats4, col_stats5 = st.columns(5)
         
         rarity_colors = {
             1: "gray", 2: "#32CD32", 3: "#1E90FF",
@@ -145,7 +145,10 @@ def render_chest_drop_tab() -> None:
             if dup_detail: st.markdown(dup_detail, unsafe_allow_html=True)
         with col_stats4:
             total_chests = sum(st.session_state.get('chest_drop_counts', {1:0,2:0,3:0,4:0,5:0}).values())
-            st.metric("📦 Tổng Chest Đã Mở", f"{total_chests}")
+            st.metric("📦 Tổng Rương Đã Mở", f"{total_chests}")
+        with col_stats5:
+            rate = (dup_total / total_cd_cards * 100) if total_cd_cards > 0 else 0
+            st.metric("♻️ Tỉ lệ Thẻ Trùng", f"{dup_total}/{total_cd_cards} ({rate:.2f}%)")
         
         st.markdown("<hr style='margin: 10px 0px; opacity: 0.3'>", unsafe_allow_html=True)
         st.caption("Chi tiết số lượng Chest đã mở từ giỏ:")

@@ -141,6 +141,7 @@ def render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_che
     start_inventory = 0 if st.session_state.get("simulate_from_scratch", True) else sum(st.session_state["inventory"].values())
     start_total_cards = start_completions * TOTAL_CARDS + start_inventory
     start_stars = 0 if st.session_state.get("simulate_from_scratch", True) else st.session_state.get("stars", 0)
+    start_dups = 0 if st.session_state.get("simulate_from_scratch", True) else st.session_state.get("dup_cards_drawn", 0) + st.session_state.get("cd_dup_cards_drawn", 0)
     
     # Metrics (Deltas)
     avg_cards_gained = df["cards"].mean() - start_total_cards
@@ -150,26 +151,30 @@ def render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_che
     completions = df[df["grand_albums"] > start_completions]
     completion_rate = len(completions) / iterations * 100
     
-    avg_dups = df.get("total_dups", pd.Series([0])).mean()
+    avg_dups_gained = df.get("total_dups", pd.Series([0])).mean() - start_dups
+    
+    total_drawn = avg_cards_gained + avg_dups_gained
+    dup_rate = (avg_dups_gained / total_drawn * 100) if total_drawn > 0 else 0
     
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Hoàn thành Album", f"{completion_rate:.1f}%")
     c2.metric("Thẻ Mới Thu Thập", f"{avg_cards_gained:.1f}")
-    c3.metric("Thẻ Trùng (Dups)", f"{avg_dups:.1f}")
-    c4.metric("Max Thẻ Mới", f"{max_cards_gained}")
-    c5.metric("Min Thẻ Mới", f"{min_cards_gained}")
+    c3.metric("Thẻ Trùng (Dups)", f"{avg_dups_gained:.1f}")
+    c4.metric("♻️ Tỉ lệ Thẻ Trùng", f"{avg_dups_gained:.1f}/{total_drawn:.1f} ({dup_rate:.2f}%)")
+    c5.metric("Max Thẻ Mới", f"{max_cards_gained}")
     
     st.write("")
     c6, c7, c8, c9, c10 = st.columns(5)
     
+    c6.metric("Min Thẻ Mới", f"{min_cards_gained}")
+    
     if auto_chest:
         avg_stars = df["stars"].mean()
-        c6.metric("Trung bình Sao Dư Thừa", f"{avg_stars:.0f} ⭐")
+        c7.metric("Trung bình Sao Dư Thừa", f"{avg_stars:.0f} ⭐")
     else:
         avg_stars_gained = df["stars"].mean() - start_stars
-        c6.metric("Trung bình Sao Nhận Được", f"{avg_stars_gained:.0f} ⭐")
+        c7.metric("Trung bình Sao Nhận Được", f"{avg_stars_gained:.0f} ⭐")
         
-    c7.empty()
     c8.empty()
     c9.empty()
     c10.empty()

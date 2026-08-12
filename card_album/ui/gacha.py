@@ -108,7 +108,7 @@ def show_draw_result_dialog(res: dict):
 def render_pack_opener_tab() -> None:
     with st.container(border=True):
         st.subheader("📊 Tổng Quan Mở Pack")
-        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+        col_stats1, col_stats2, col_stats3, col_stats4, col_stats5 = st.columns(5)
         
         rarity_colors = {
             1: "gray", 2: "#32CD32", 3: "#1E90FF",
@@ -141,7 +141,8 @@ def render_pack_opener_tab() -> None:
         dup_detail = f"<div style='font-size:0.85em; margin-top:-10px; color:#aaa'>({', '.join(dup_parts)})</div>" if dup_parts else ""
         
         with col_stats1:
-            st.metric("🃏 Tổng Thẻ Rút Ra", f"{st.session_state['total_cards_drawn']}")
+            total_drawn = st.session_state['total_cards_drawn']
+            st.metric("🃏 Tổng Thẻ Rút Ra", f"{total_drawn}")
         with col_stats2:
             st.metric("🎴 Thẻ Mới Nhận", f"{new_total}")
             if new_detail: st.markdown(new_detail, unsafe_allow_html=True)
@@ -151,6 +152,9 @@ def render_pack_opener_tab() -> None:
             if dup_detail: st.markdown(dup_detail, unsafe_allow_html=True)
         with col_stats4:
             st.metric("📦 Tổng Pack Đã Mở", f"{st.session_state['total_packs']}")
+        with col_stats5:
+            rate = (dup_total / total_drawn * 100) if total_drawn > 0 else 0
+            st.metric("♻️ Tỉ lệ Thẻ Trùng", f"{dup_total}/{total_drawn} ({rate:.2f}%)")
         
         st.markdown("<hr style='margin: 10px 0px; opacity: 0.3'>", unsafe_allow_html=True)
         st.caption("Chi tiết số lượng từng gói đã mở:")

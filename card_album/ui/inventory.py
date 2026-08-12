@@ -39,7 +39,7 @@ def render_inventory_tab() -> None:
     is_finished = st.session_state.get("grand_album_finished", False)
     
     st.subheader("Tiến độ Album")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("🎴 Thẻ thu thập được", f"{total_cards} / {TOTAL_CARDS}")
@@ -52,6 +52,10 @@ def render_inventory_tab() -> None:
     total_new = st.session_state.get('new_cards_drawn', 0) + st.session_state.get('cd_new_cards_drawn', 0)
     total_dup = st.session_state.get('dup_cards_drawn', 0) + st.session_state.get('cd_dup_cards_drawn', 0)
     col3.metric("📈 Thẻ Mới / Thẻ Trùng", f"{total_new} / {total_dup}")
+    
+    total_drawn = total_new + total_dup
+    dup_rate = (total_dup / total_drawn * 100) if total_drawn > 0 else 0
+    col4.metric("♻️ Tỉ lệ Thẻ Trùng", f"{total_dup}/{total_drawn} ({dup_rate:.2f}%)")
     
     st.divider()
     st.subheader("Tiến độ theo Độ Hiếm")
