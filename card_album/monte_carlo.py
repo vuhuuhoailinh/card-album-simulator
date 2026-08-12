@@ -156,16 +156,16 @@ def render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_che
     total_drawn = avg_cards_gained + avg_dups_gained
     dup_rate = (avg_dups_gained / total_drawn * 100) if total_drawn > 0 else 0
     
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Hoàn thành Album", f"{completion_rate:.1f}%")
     c2.metric("Thẻ Mới Thu Thập", f"{avg_cards_gained:.1f}")
     c3.metric("Thẻ Trùng (Dups)", f"{avg_dups_gained:.1f}")
     c4.metric("♻️ Tỉ lệ Thẻ Trùng", f"{avg_dups_gained:.1f}/{total_drawn:.1f} ({dup_rate:.2f}%)")
-    c5.metric("Max Thẻ Mới", f"{max_cards_gained}")
     
     st.write("")
-    c6, c7, c8, c9, c10 = st.columns(5)
+    c5, c6, c7, c8 = st.columns(4)
     
+    c5.metric("Max Thẻ Mới", f"{max_cards_gained}")
     c6.metric("Min Thẻ Mới", f"{min_cards_gained}")
     
     if auto_chest:
@@ -176,8 +176,6 @@ def render_monte_carlo_results(res, iterations, total_cart_packs, total_cart_che
         c7.metric("Trung bình Sao Nhận Được", f"{avg_stars_gained:.0f} ⭐")
         
     c8.empty()
-    c9.empty()
-    c10.empty()
     
     # Charts
     st.info("💡 **Lưu ý:** Để biểu đồ hiển thị chuẩn xác và không bị gãy đoạn do cơ chế Reset của Grand Album, **Số Thẻ Cuối Cùng** sẽ được cộng dồn liên tục nếu bạn vượt quá 135 thẻ. (VD: Nếu bạn full album bị reset về 0, rồi bóc thêm được 10 thẻ nữa, hệ thống sẽ ghi nhận bạn có 145 thẻ).")

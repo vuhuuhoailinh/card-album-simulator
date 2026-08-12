@@ -112,11 +112,12 @@ def render_config_tab():
     
     st.markdown("### 1. Gacha Cơ Bản (Mở Gói)")
     power = st.session_state["draft_new_card_power"]
-    new_power = st.slider(
-        "Hệ số Khó chung (x) theo công thức: **New Card Ratio = (Remaining New/Total)^(x+y) + Pity**", 
-        min_value=0.1, max_value=5.0, value=float(power), step=0.1, 
-        help="Hệ số lũy thừa x. Giá trị càng cao, khi bạn sưu tập được càng nhiều thẻ thì cơ hội ra thẻ mới càng nhỏ."
-    )
+    if "ui_new_power" not in st.session_state:
+        st.session_state["ui_new_power"] = float(power)
+    st.markdown("Hệ số Khó chung (x) theo công thức: **New Card Ratio = (Remaining New/Total)^(x+y) + Pity**", help="Hệ số lũy thừa x. Giá trị càng cao, khi bạn sưu tập được càng nhiều thẻ thì cơ hội ra thẻ mới càng nhỏ.")
+    c1, _ = st.columns([1, 4])
+    with c1:
+        st.number_input("power_input", step=0.1, label_visibility="collapsed", key="ui_new_power")
     st.session_state["draft_new_card_formula_type"] = "document"
     st.caption("Lưu ý: Hệ số y sẽ phụ thuộc vào từng loại Pack (Cấu hình ở bảng bên dưới).")
     
@@ -124,11 +125,12 @@ def render_config_tab():
     st.markdown("### 2. Đập Rương (Chest Drop)")
     
     chest_x = st.session_state["draft_chest_drop_x"]
-    new_chest_x = st.slider(
-        "Hệ số Khó chung của Đập Rương (x): **New Card Ratio = (Remaining New/Total)^(x+y)**", 
-        min_value=0.1, max_value=5.0, value=float(chest_x), step=0.1,
-        help="Hệ số x cho Đập Rương. Hệ số y sẽ phụ thuộc trực tiếp vào độ hiếm của thẻ (1-Sao y=1.0, 2-Sao y=0.5, 3-Sao y=0.0, 4-Sao y=-0.5, 5-Sao y=-1.0, 6-Sao y=-1.5)."
-    )
+    if "ui_chest_x" not in st.session_state:
+        st.session_state["ui_chest_x"] = float(chest_x)
+    st.markdown("Hệ số Khó chung của Đập Rương (x): **New Card Ratio = (Remaining New/Total)^(x+y)**", help="Hệ số x cho Đập Rương. Hệ số y sẽ phụ thuộc trực tiếp vào độ hiếm của thẻ (1-Sao y=1.0, 2-Sao y=0.5, 3-Sao y=0.0, 4-Sao y=-0.5, 5-Sao y=-1.0, 6-Sao y=-1.5).")
+    c2, _ = st.columns([1, 4])
+    with c2:
+        st.number_input("chest_power_input", step=0.1, label_visibility="collapsed", key="ui_chest_x")
     
     st.markdown("**Bảng Cấu Hình Tỉ Lệ Đập Rương (Chest Drop Tiers):**")
     st.caption("Cấu hình tỉ lệ thăng cấp, hệ số y_value và trọng số rớt thẻ (weights) cho từng cấp rương.")
@@ -260,10 +262,12 @@ def render_config_tab():
 
     if applied:
         # Apply System Config
+        new_power = st.session_state["ui_new_power"]
         st.session_state["draft_new_card_power"] = new_power
         st.session_state["new_card_formula_type"] = "document"
         st.session_state["new_card_power"] = new_power
         
+        new_chest_x = st.session_state["ui_chest_x"]
         st.session_state["draft_chest_drop_x"] = new_chest_x
         st.session_state["config_chest_drop_x"] = new_chest_x
         
