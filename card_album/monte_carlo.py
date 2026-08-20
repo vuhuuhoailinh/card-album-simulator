@@ -90,9 +90,16 @@ def run_monte_carlo(base_state, cart_packs, cart_chests, iterations, simulate_fr
             "cd_stars_gained": 0 if simulate_from_scratch else base_state.get("cd_stars_gained", 0),
             "chest_drop_counts": {r: 0 for r in range(1, 6)} if simulate_from_scratch else copy.deepcopy(base_state.get("chest_drop_counts", {r: 0 for r in range(1, 6)})),
             "config_chest_drop_tiers": base_state.get("config_chest_drop_tiers", {}),
+            "config_chest_upgrade_matrix": base_state.get("config_chest_upgrade_matrix", {}),
             "config_chest_drop_x": base_state.get("config_chest_drop_x", 2.0),
             "cd_new_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("cd_new_cards_by_rarity", {r: 0 for r in range(1, 7)})),
             "cd_dup_cards_by_rarity": {r: 0 for r in range(1, 7)} if simulate_from_scratch else copy.deepcopy(base_state.get("cd_dup_cards_by_rarity", {r: 0 for r in range(1, 7)})),
+            "opened_pack_types_ss2": set() if simulate_from_scratch else copy.deepcopy(base_state.get("opened_pack_types_ss2", set())),
+            "ss2_optimize_collection": base_state.get("ss2_optimize_collection", True),
+            "config_ss2_s_base": base_state.get("config_ss2_s_base", 0.1),
+            "config_ss2_s_max": base_state.get("config_ss2_s_max", 0.5),
+            "config_ss2_c_base": base_state.get("config_ss2_c_base", 0.3),
+            "config_ss2_c_max": base_state.get("config_ss2_c_max", 1.0),
         }
         
         # Run the bulk open packs (without auto_chest yet)

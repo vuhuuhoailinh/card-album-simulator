@@ -157,6 +157,10 @@ def render_chest_drop_tab() -> None:
         for i in range(1, 6):
             with pack_cols[i - 1]:
                 st.markdown(f"**Rương {st_color_tier(i)}**: {cd_counts.get(i, 0)}")
+                
+        st.markdown("<hr style='margin: 10px 0px; opacity: 0.3'>", unsafe_allow_html=True)
+        from .gacha import render_ss2_pity_panel
+        render_ss2_pity_panel()
     
     upgrade_cfg = st.session_state.get('config_chest_drop_tiers', {})
     

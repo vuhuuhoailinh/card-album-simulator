@@ -49,7 +49,7 @@ def get_default_config() -> dict:
             "key_collection_rewards": copy.deepcopy(KEY_COLLECTION_REWARDS),
         },
         "system": {
-            "new_card_power": 3.0,
+            "new_card_power": 2.5,
             "new_card_formula_type": "document",
             "chest_drop_x": 2.0
         }

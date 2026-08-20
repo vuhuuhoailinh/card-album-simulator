@@ -15,11 +15,20 @@ from ..state import ensure_album_state, reset_progress, total_cards_collected
 from ..liveops_simulator import simulate_liveops
 
 def render_grand_album_section() -> None:
-    st.toggle(
-        "🏆 Grand Album",
-        key="grand_album_enabled",
-        help="Khi bật, cho phép Album tự động reset khi cày đủ 135 thẻ (áp dụng cho cả Mở Pack và Mô Phỏng).",
-    )
+    col_toggles = st.columns(2)
+    with col_toggles[0]:
+        st.toggle(
+            "🏆 Grand Album",
+            key="grand_album_enabled",
+            help="Khi bật, cho phép Album tự động reset khi cày đủ 135 thẻ (áp dụng cho cả Mở Pack và Mô Phỏng).",
+        )
+    with col_toggles[1]:
+        st.toggle(
+            "🚀 SS2 Optimize Collection",
+            key="ss2_optimize_collection",
+            value=True,
+            help="Tối ưu Card Collection Season 2: First Pack Luck & Set Completion Pity.",
+        )
     if st.session_state.get("grand_album_enabled", True):
         st.caption("Grand Album: Khi đạt mốc 135 thẻ, kho thẻ tự reset về 0 (giữ nguyên Sao). Các thẻ tiếp theo rút được sẽ tính cho vòng Album mới.")
 

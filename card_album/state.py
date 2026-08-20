@@ -84,6 +84,8 @@ def ensure_album_state(session_state) -> None:
         session_state["cd_active_session"] = None
     if "cd_history" not in session_state:
         session_state["cd_history"] = []
+    if "opened_pack_types_ss2" not in session_state:
+        session_state["opened_pack_types_ss2"] = set()
 
 
 def reset_progress(session_state) -> None:
@@ -93,7 +95,7 @@ def reset_progress(session_state) -> None:
         "owned_cards", "total_cards_drawn", "new_cards_drawn", "dup_cards_drawn", "pack_stars_gained",
         "new_cards_by_rarity", "dup_cards_by_rarity",
         "cd_total_cards_drawn", "cd_new_cards_drawn", "cd_dup_cards_drawn", "cd_stars_gained",
-        "cd_new_cards_by_rarity", "cd_dup_cards_by_rarity", "chest_drop_counts"
+        "cd_new_cards_by_rarity", "cd_dup_cards_by_rarity", "chest_drop_counts", "opened_pack_types_ss2"
     ]
     for k in keys_to_clear:
         session_state.pop(k, None)

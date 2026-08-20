@@ -40,6 +40,34 @@ def render_pity_panel(selected_pack: str) -> None:
     if pity_rules:
         st.caption(f"*Cơ chế (Tạch liên tiếp): {', '.join(pity_rules)}*")
 
+def render_ss2_pity_panel() -> None:
+    if st.session_state.get("ss2_optimize_collection", True):
+        from ..gacha import get_ss2_pity_info
+        info = get_ss2_pity_info(st.session_state)
+        
+        st.subheader("🤖 Tối ưu Bộ Sưu Tập (SS2)")
+        
+        c1, c2, c3 = st.columns([1, 1.2, 1.5])
+        with c1:
+            st.metric("📦 Set Đã Xong", f"{info['completed_sets']}/{info['total_sets']}")
+            st.caption(f"Độ mót (Pity Set): **{info['pity_set']*100:.1f}%**")
+        with c2:
+            st.metric("🎯 Set Gần Xong Nhất", info['best_set_name'] if info['best_set_id'] else "Chưa có")
+            st.caption(f"Tiến độ: **{info['best_set_owned']}/{info['best_set_total']} thẻ**" if info['best_set_id'] else "")
+            
+        with c3:
+            if info['missing_details']:
+                st.markdown(f"**🔍 Chi tiết Tỉ Lệ Động ({info['best_set_name']}):**")
+                for detail in info['missing_details']:
+                    rarity = detail['rarity']
+                    icon = "⭐" if rarity < 6 else "🌟"
+                    r_label = f"{rarity}{icon}" if rarity < 6 else "VÀNG"
+                    st.caption(
+                        f"- Thiếu **{detail['missing_count']} thẻ {r_label}** ➔ "
+                        f"Tỉ lệ ép bài: **{detail['final_chance']*100:.1f}%** "
+                        f"*(Pity Rarity: {detail['pity_rarity']*100:.1f}%)*"
+                    )
+
 
 @st.dialog("BẠN VỪA NHẬN ĐƯỢC!", width="large")
 def show_draw_result_dialog(res: dict):
@@ -162,6 +190,9 @@ def render_pack_opener_tab() -> None:
         for i, pack in enumerate(PACK_ORDER):
             with pack_cols[i % 5]:
                 st.markdown(f"**{PACK_ICONS[pack]} {pack}**: {st.session_state['pack_counts'][pack]}")
+                
+        st.markdown("<hr style='margin: 10px 0px; opacity: 0.3'>", unsafe_allow_html=True)
+        render_ss2_pity_panel()
             
     st.markdown("<hr style='margin: 15px 0px; opacity: 0.3'>", unsafe_allow_html=True)
     

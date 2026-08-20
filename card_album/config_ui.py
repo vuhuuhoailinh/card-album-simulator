@@ -103,8 +103,18 @@ def render_config_tab():
         
         **4. Cơ chế Bảo hiểm (Pity System):**
         - Mỗi gói thẻ sẽ có bộ đếm bảo hiểm (Pity) chạy hoàn toàn ĐỘC LẬP với nhau.
-        - **Pity Threshold**: Số lần mở gói xịt (không ra thẻ mới) liên tiếp để KÍCH HOẠT bảo hiểm. (VD: Nếu = 3, thì mở xịt đúng 3 lần sẽ được cộng % bảo hiểm).
-        - **Pity Incr**: % cơ hội ra thẻ mới được cộng thêm mỗi lần xịt tính từ mốc Threshold. (Ví dụ: 0.2 = +20% cơ hội).
+        - Mỗi khi bạn mở một gói thẻ và tạch (không ra thẻ mới), bộ đếm của loại gói đó sẽ tăng lên 1.
+        - Khi tạch đến ngưỡng `Pity Threshold` (vd: 3 lần), hệ thống sẽ buff thêm `Pity Incr` (vd: +20%) vào Tỉ lệ ra thẻ mới ở lần mở gói tiếp theo. Càng tạch nhiều, buff càng to (Tối đa +100%).
+        
+        **5. Cơ chế Tối ưu Bộ Sưu Tập (SS2):**
+        Khi bật tính năng **SS2 Optimize Collection**, game sẽ kích hoạt 2 cơ chế:
+        - **First Pack Luck**: Lần ĐẦU TIÊN mở bất kỳ Gói hoặc Rương ở các cấp, chắc chắn 100% rớt Thẻ Mới.
+        - **Set Completion Pity**: Bàn tay vô hình nhét thẻ bạn thiếu vào set gần hoàn thành nhất. 
+          *Xác suất = (Độ mót của Album) × (Độ rẻ của Thẻ)*.
+          > **Độ mót (Pity Set)**: `S.Base + (S.Max - S.Base) * (1 - Số Set Xong / Tổng Set)`. 
+          > Càng xong ít Set, xác suất nhét bài càng cao (Max bằng S.Max).
+          > **Độ rẻ (Pity Rarity)**: `C.Base + (C.Max - C.Base) * (5 - Rarity) / 4`.
+          > Thẻ càng rẻ (ít Sao) thì xác suất nhét vào set càng cao (Max bằng C.Max đối với thẻ 1-sao).
         """)
 
     # ----------------- SYSTEM CONFIG -----------------
@@ -196,6 +206,28 @@ def render_config_tab():
 
     st.divider()
     
+    st.write("")
+    st.markdown("### 3. Tối ưu Bộ Sưu Tập (SS2 Optimize Collection)")
+    st.caption("Cấu hình tỉ lệ rớt bù (Pity) khi mở thẻ mới, giúp người chơi dễ dàng hoàn thành Set đang dở.")
+    
+    if "ui_ss2_s_base" not in st.session_state:
+        st.session_state["ui_ss2_s_base"] = float(st.session_state.get("config_ss2_s_base", 0.1))
+        st.session_state["ui_ss2_s_max"] = float(st.session_state.get("config_ss2_s_max", 0.5))
+        st.session_state["ui_ss2_c_base"] = float(st.session_state.get("config_ss2_c_base", 0.3))
+        st.session_state["ui_ss2_c_max"] = float(st.session_state.get("config_ss2_c_max", 1.0))
+        
+    cc1, cc2, cc3, cc4 = st.columns(4)
+    with cc1:
+        st.number_input("S.Base (Độ mót Min)", step=0.01, key="ui_ss2_s_base", help="Hệ số bù thấp nhất khi đã xong nhiều Set")
+    with cc2:
+        st.number_input("S.Max (Độ mót Max)", step=0.01, key="ui_ss2_s_max", help="Hệ số bù cao nhất khi chưa xong Set nào")
+    with cc3:
+        st.number_input("C.Base (Độ rẻ Min)", step=0.01, key="ui_ss2_c_base", help="Hệ số buff đối với Thẻ khó ra (Thẻ 5-Sao)")
+    with cc4:
+        st.number_input("C.Max (Độ rẻ Max)", step=0.01, key="ui_ss2_c_max", help="Hệ số buff đối với Thẻ siêu dễ (Thẻ 1-Sao)")
+
+    st.divider()
+    
     # ----------------- PACKS CONFIG -----------------
     st.subheader("🎲 Tỉ lệ rớt của các Gói Thẻ")
     st.caption("Cấu hình số thẻ trong mỗi gói, thẻ bảo hiểm, hệ số rớt (y_value) và trọng số (weights) của từng độ hiếm.")
@@ -270,6 +302,11 @@ def render_config_tab():
         new_chest_x = st.session_state["ui_chest_x"]
         st.session_state["draft_chest_drop_x"] = new_chest_x
         st.session_state["config_chest_drop_x"] = new_chest_x
+        
+        st.session_state["config_ss2_s_base"] = st.session_state["ui_ss2_s_base"]
+        st.session_state["config_ss2_s_max"] = st.session_state["ui_ss2_s_max"]
+        st.session_state["config_ss2_c_base"] = st.session_state["ui_ss2_c_base"]
+        st.session_state["config_ss2_c_max"] = st.session_state["ui_ss2_c_max"]
         
         # Apply Chest Tiers Config
         for idx, row in edited_chest_tiers.iterrows():
