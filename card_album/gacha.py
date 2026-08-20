@@ -585,7 +585,7 @@ def roll_chest_drop_card(session_state, rarity: int, y_val: float, drawn_in_batc
             
     if random.random() < new_chance:
         session_state['inventory'][rarity] += 1
-        c = pick_new_card(session_state, rarity, drawn_in_batch, apply_set_pity=False)
+        c = pick_new_card(session_state, rarity, drawn_in_batch)
         session_state['cd_new_cards_drawn'] += 1
         session_state['cd_new_cards_by_rarity'][rarity] += 1
         check_grand_album(session_state)
