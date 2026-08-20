@@ -108,13 +108,10 @@ def render_config_tab():
         
         **5. Cơ chế Tối ưu Bộ Sưu Tập (SS2):**
         Khi bật tính năng **SS2 Optimize Collection**, game sẽ kích hoạt 2 cơ chế:
-        - **First Pack Luck**: Lần ĐẦU TIÊN mở bất kỳ Gói hoặc Rương ở các cấp, chắc chắn 100% rớt Thẻ Mới.
-        - **Set Completion Pity**: Bàn tay vô hình nhét thẻ bạn thiếu vào set gần hoàn thành nhất. 
-          *Xác suất = (Độ mót của Album) × (Độ rẻ của Thẻ)*.
-          > **Độ mót (Pity Set)**: `S.Base + (S.Max - S.Base) * (1 - Số Set Xong / Tổng Set)`. 
-          > Càng xong ít Set, xác suất nhét bài càng cao (Max bằng S.Max).
-          > **Độ rẻ (Pity Rarity)**: `C.Base + (C.Max - C.Base) * (5 - Rarity) / 4`.
-          > Thẻ càng rẻ (ít Sao) thì xác suất nhét vào set càng cao (Max bằng C.Max đối với thẻ 1-sao).
+        - **First Pack Luck**: Lần ĐẦU TIÊN mở bất kỳ Gói thẻ nào, chắc chắn 100% rớt Thẻ Mới.
+        - **Set Completion Pity**: Bàn tay vô hình nhét thẻ bạn thiếu vào set gần hoàn thành nhất. Xác suất = (Độ mót của Album) × (Độ rẻ của Thẻ).
+          > **Độ mót (Pity Set)**: `S.Base + (S.Max - S.Base) * (1 - Số Set Xong / Tổng Set)`. Càng xong ít Set, xác suất nhét bài càng cao (Max bằng S.Max).
+          > **Độ rẻ (Pity Rarity)**: `C.Base + (C.Max - C.Base) * (5 - Rarity) / 4`. Thẻ càng rẻ (ít Sao) thì xác suất nhét vào set càng cao (Max bằng C.Max đối với thẻ 1-sao).
         """)
 
     # ----------------- SYSTEM CONFIG -----------------

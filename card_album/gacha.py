@@ -123,7 +123,7 @@ def get_ss2_pity_info(session_state) -> dict:
         "missing_details": missing_details
     }
 
-def pick_new_card(session_state, rarity: int, drawn_in_batch: set = None):
+def pick_new_card(session_state, rarity: int, drawn_in_batch: set = None, apply_set_pity: bool = True):
     possible_cards = []
     from .config import CARD_SETS
     for set_id, set_info in CARD_SETS.items():
@@ -138,13 +138,12 @@ def pick_new_card(session_state, rarity: int, drawn_in_batch: set = None):
     missing_cards = [c for c in possible_cards if c not in session_state["owned_cards"] and c not in drawn_in_batch]
     import random
     
-    if session_state.get("ss2_optimize_collection", True):
+    if apply_set_pity and session_state.get("ss2_optimize_collection", True):
         # Calculate completion per set
         set_counts = {}
         for c in session_state["owned_cards"]:
-            if c not in drawn_in_batch:
-                s_id = c[0]
-                set_counts[s_id] = set_counts.get(s_id, 0) + 1
+            s_id = c[0]
+            set_counts[s_id] = set_counts.get(s_id, 0) + 1
                 
         completed_sets = 0
         best_set_id = None
@@ -164,7 +163,7 @@ def pick_new_card(session_state, rarity: int, drawn_in_batch: set = None):
             s_info = CARD_SETS[best_set_id]
             if rarity in s_info["cards"]:
                 total_rarity = s_info["cards"][rarity]
-                owned_rarity_count = sum(1 for c in session_state["owned_cards"] if c[0] == best_set_id and c[1] == rarity and c not in drawn_in_batch)
+                owned_rarity_count = sum(1 for c in session_state["owned_cards"] if c[0] == best_set_id and c[1] == rarity)
                 
                 if owned_rarity_count < total_rarity:
                     s_base = session_state.get("config_ss2_s_base", 0.1)
@@ -583,18 +582,10 @@ def calculate_chest_drop_new_chance(session_state, rarity: int, y_val: float) ->
 def roll_chest_drop_card(session_state, rarity: int, y_val: float, drawn_in_batch: set = None) -> tuple[str, tuple]:
     session_state['cd_total_cards_drawn'] += 1
     new_chance = calculate_chest_drop_new_chance(session_state, rarity, y_val)
-    
-    if session_state.get("ss2_optimize_collection", True):
-        chest_type = f"Chest_Tier_{rarity}"
-        if "opened_pack_types_ss2" not in session_state:
-            session_state["opened_pack_types_ss2"] = set()
-        if chest_type not in session_state["opened_pack_types_ss2"]:
-            session_state["opened_pack_types_ss2"].add(chest_type)
-            new_chance = 1.0
             
     if random.random() < new_chance:
         session_state['inventory'][rarity] += 1
-        c = pick_new_card(session_state, rarity, drawn_in_batch)
+        c = pick_new_card(session_state, rarity, drawn_in_batch, apply_set_pity=False)
         session_state['cd_new_cards_drawn'] += 1
         session_state['cd_new_cards_by_rarity'][rarity] += 1
         check_grand_album(session_state)
